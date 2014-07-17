@@ -7,11 +7,15 @@ import satdetect.featextractor as featextractor
 
 def main():
   parser = argparse.ArgumentParser()
-  parser.add_argument('setName', type=str)
+  parser.add_argument('datapath', type=str)
   parser.add_argument('featName', type=str)
   parser.add_argument('--window_shape', type=str, default='25,25')
   args = parser.parse_args()
   ArgParseUtil.parse_window_shape_inplace(args)
+
+  
+  featextractor.extractRawPixelsForDataset(args.datapath,
+                                           window_shape=args.window_shape)
 
   if args.featName == 'hog':
     featextractor.extract_hog_features_for_dataset(args.setName, 

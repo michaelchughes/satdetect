@@ -27,6 +27,10 @@ def view_as_windows_with_bbox(Im, window_shape, step):
   BBox[:,3] = Bx.flatten() + window_shape[1]
   return WindowImSet, BBox
 
+def loadStdBBox(path, window_shape=(25,25)):
+  BBox = ioutil.loadBBox(path)
+  return convert_pos_bbox_to_standard_size(BBox, window_shape)
+
 def load_pos_bbox_standard_size(setName, imageID, window_shape=(25,25)):
   PBox = ioutil.load_pos_pxbbox(setName, imageID)
   return convert_pos_bbox_to_standard_size(PBox, window_shape=window_shape)

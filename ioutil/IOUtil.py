@@ -60,6 +60,30 @@ def get_path_to_labeled_feats(setName, imageID, window_shape, featName, prefix='
   mkpath(fpath)
   return os.path.join(fpath, basename)
 
+
+def loadImage(path, basename='', color='rgb'):
+  ''' Load JPG image from file
+  '''
+  path = str(path)
+  if len(basename) > 0:
+    path = os.path.join(path, basename)
+  if color == 'gray' or color == 'grey':
+    IM = imread(path, as_grey=True)
+    assert IM.ndim == 2
+  else:
+    IM = imread(path)
+    assert IM.ndim == 3
+
+  IM = np.asarray(IM, dtype=np.float)
+  assert IM.min() >= 0.0
+  assert IM.max() <= 1.0
+  return IM
+
+def loadBBox(path):
+  BBox = np.loadtxt(path, dtype=np.int32)
+  return BBox
+
+"""
 ########################################################### labeled_images
 ########################################################### 
 def load_labeled_images(setName, imageID, window_shape, color, include_bbox=0):
@@ -107,3 +131,4 @@ def load_jpg(setName, imageID):
 def load_pos_pxbbox(setName, imageID):
   P = np.loadtxt(get_path_to_pos_pxbbox(setName, imageID), dtype=np.int32)
   return P
+"""

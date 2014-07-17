@@ -3,8 +3,12 @@
 import numpy as np
 import skimage.color
 import sklearn.neighbors
+import scipy.spatial.distance
 import time
 import warnings
+import glob
+import os
+from distutils.dir_util import mkpath
 
 import BoundBox
 import satdetect.ioutil as ioutil
@@ -13,23 +17,58 @@ from matplotlib import pylab
 
 OFFLIMITSVAL = -255
 
-def makeAndSaveAllStdObjects(datapath, window_shape=(25,25), nNegSamples=500):
-  for imageID in range(4):
-    Im = ioutil.load_jpg(setName, imageID, 'gray')
-    PosBBox = BoundBox.load_pos_bbox_standard_size(setName, imageID,
-                                                   window_shape=window_shape)
+def makeAndSaveAllStdObjects(datapath, window_shape=(25,25), 
+                                       nNegSamples=50,
+                                       stride=5):
+  PathList = glob.glob(os.path.join(datapath, 'xobjects', '*.jpg'))
+  for curpath in sorted(PathList):
+    assert curpath.count('.') == 1
+    curpath = curpath.split('.')[0]
+    basename = curpath.split(os.path.sep)[-1]
+
+    curimgpath = curpath + '.jpg'
+    Im = ioutil.loadImage(curimgpath, color='gray')
+    PosBBox = BoundBox.loadStdBBox(curpath + '_huts.pxbbox', window_shape)
+    NegBBox = makeStdObjects_Background(Im, PosBBox, 
+                                          nNegSamples=nNegSamples,
+                                          stride=stride)
+
+    PosXY = PosBBox[:, [0,2]]
+    NegXY = NegBBox[:, [0,2]]
+    ## Verify that the negative bboxes are distinct
+    ##  that is, they should all differ from each other by more than stride
+    DistMat = scipy.spatial.distance.cdist(PosXY, NegXY)    
+    assert DistMat.min() >= stride
+
+    ## Verify that the negative bboxes are unique
+    ##  that is, they should all differ from each other by more than stride
+    DistMat = scipy.spatial.distance.cdist(NegXY, NegXY)    
+    DistMat += 1e6 * np.eye(DistMat.shape[0]) # ignore self-distances
+    assert DistMat.min() >= stride
+
+    ## Write to file
+    foldername = 'huts-%dx%d' % (window_shape[0], window_shape[1])
+    outpath = os.path.join(datapath, 'xfeatures', foldername)
+    mkpath(outpath)
+    fpath = os.path.join(outpath, basename + '.npz')
+    np.savez_compressed(fpath, PosBBox=PosBBox, NegBBox=NegBBox,
+                               imgpath=curimgpath,
+                               basename=basename)
 
     
-    NegBBox = makeStdObjects_Background(Im, PosBBox, 
-                                        nNegSamples=nNegSamples,
-                                        stride=stride)
-
+    
 
 def makeStdObjects_Background(Im, PosBBox, stride=5,
                                            nNegSamples=500, return_Img=0):
   ''' Calc bounding boxes for many candidate *background* objects
 
-      Uses nearest neighbor search (in pixel space)
+      Uses nearest neighbor search to find high-quality negatives.
+
+      Returns
+      --------
+      NegBBox : 2D array, size nNegSamples x 4
+                each row defines a bounding box for a single negative example
+                         [ymin, ymax, xmin, xmax]
   '''
   ## Parse Inputs
   Im = np.asarray(Im.copy(), dtype=np.float32)
@@ -53,9 +92,8 @@ def makeStdObjects_Background(Im, PosBBox, stride=5,
 
   # Loop over all positive stdobjects, 
   #  find top K matches (nearest neighbors) among candidate neg windows
-  K = int(np.ceil(nNegSamples / nPos))
+  K = int(np.ceil(nNegSamples / float(nPos)))
   for pID in xrange(nPos):
-
     curXY = findKNearestWindowsInImage(Im, RefIms[pID], K, stride)
 
     ## Mask out all selections in curXY, so they don't get picked again
@@ -71,6 +109,11 @@ def makeStdObjects_Background(Im, PosBBox, stride=5,
       NegXY = np.vstack([NegXY, curXY])
 
   NegBBox = xy2BBox(NegXY, window_shape)
+
+  assert NegBBox.shape[0] >= nNegSamples
+  if NegBBox.shape[0] > nNegSamples:
+    NegBBox = NegBBox[:nNegSamples]
+
   if return_Img:
     return NegBBox, Im
   return NegBBox
@@ -146,6 +189,10 @@ def xy2BBox(XY, window_shape):
     BBox[r,2] = XY[r,1]
     BBox[r,3] = XY[r,1] + window_shape[1]
   return BBox
+
+
+if __name__ == '__main__':
+  makeAndSaveAllStdObjects('/data/tukuls/Sudan/', (25,25))
 
 """
   # Searching entire image may be expensive, so we instead focus search
