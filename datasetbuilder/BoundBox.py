@@ -100,4 +100,5 @@ def get_bound_box_with_significant_overlap(BBox, window_shape=(25,25)):
   BBox[:,2] -= W // 2
   BBox[:,1] -= H // 5
   BBox[:,3] -= W // 5
+  np.maximum(BBox, 0, out=BBox)
   return BBox
