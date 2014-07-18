@@ -14,15 +14,17 @@ def main():
   ArgParseUtil.parse_window_shape_inplace(args)
 
   
-  featextractor.extractRawPixelsForDataset(args.datapath,
+  featextractor.extractRawPixelsForDataset(args.datapath, color='gray',
                                            window_shape=args.window_shape)
 
+  try:
+    featextractor.extractRawPixelsForDataset(args.datapath, color='rgb',
+                                           window_shape=args.window_shape)
+  except ValueError as e:
+    print str(e)
+
   if args.featName == 'hog':
-    featextractor.extract_hog_features_for_dataset(args.setName, 
-                                                 args.window_shape)
-  elif args.featName == 'lbp':
-    featextractor.extract_lbp_features_for_dataset(args.setName, 
-                                                 args.window_shape)
+    featextractor.extractHOGForDataset(args.datapath)
 
 if __name__ == '__main__':
   main()

@@ -63,6 +63,10 @@ def get_path_to_labeled_feats(setName, imageID, window_shape, featName, prefix='
 
 def loadImage(path, basename='', color='rgb'):
   ''' Load JPG image from file
+
+      Returns
+      --------
+      IM : 2D or 3D array, size H x W x nColors
   '''
   path = str(path)
   if len(basename) > 0:
@@ -71,12 +75,22 @@ def loadImage(path, basename='', color='rgb'):
     IM = imread(path, as_grey=True)
     assert IM.ndim == 2
   else:
-    IM = imread(path)
-    assert IM.ndim == 3
+    IM = imread(path, as_grey=False)
+    if not IM.ndim == 3:
+      raise ValueError('Color image not available.')
+
+  if IM.dtype == np.float:
+    MaxVal = 1.0
+  elif IM.dtype == np.uint8:
+    MaxVal = 255
+  else:
+    raise ValueError("Unrecognized dtype: %s" % (IM.dtype))
+  assert IM.min() >= 0.0
+  assert IM.max() <= MaxVal
 
   IM = np.asarray(IM, dtype=np.float)
-  assert IM.min() >= 0.0
-  assert IM.max() <= 1.0
+  if MaxVal > 1:
+    IM /= MaxVal
   return IM
 
 def loadBBox(path):

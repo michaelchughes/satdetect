@@ -26,6 +26,8 @@ def makeAndSaveAllStdObjects(datapath, window_shape=(25,25),
     curpath = curpath.split('.')[0]
     basename = curpath.split(os.path.sep)[-1]
 
+    print '================================================ %s' % (basename)
+
     curimgpath = curpath + '.jpg'
     Im = ioutil.loadImage(curimgpath, color='gray')
     PosBBox = BoundBox.loadStdBBox(curpath + '_huts.pxbbox', window_shape)
@@ -90,11 +92,18 @@ def makeStdObjects_Background(Im, PosBBox, stride=5,
   for pID in xrange(nPos):
     Im[OBox[pID,0]:OBox[pID,1], OBox[pID,2]:OBox[pID,3]] = OFFLIMITSVAL
 
+  print 'Mining hard negatives via knn search...'
   # Loop over all positive stdobjects, 
   #  find top K matches (nearest neighbors) among candidate neg windows
   K = int(np.ceil(nNegSamples / float(nPos)))
+  stime = time.time()
   for pID in xrange(nPos):
+
+    print "................. pos example %d/%d " % (pID+1,nPos)
+
     curXY = findKNearestWindowsInImage(Im, RefIms[pID], K, stride)
+    assert curXY.shape[0] == K
+    print '%d matches found in %.1f sec' % (curXY.shape[0], time.time()-stime)
 
     ## Mask out all selections in curXY, so they don't get picked again
     for nID in xrange(curXY.shape[0]):

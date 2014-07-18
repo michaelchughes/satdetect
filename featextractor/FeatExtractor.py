@@ -12,13 +12,15 @@ import satdetect.ioutil as ioutil
 def extractRawPixelsForDataset(datapath, color='gray', window_shape=(25,25)):
   ''' Extract raw gray-scale features
   '''
+  if color not in ['gray', 'rgb']:
+    raise ValueError('Unrecognized value: %s' % (color))
   bboxFiles = glob.glob(os.path.join(datapath, '*.npz'))
   for curpath in bboxFiles:
     B = np.load(curpath)
-    IM = ioutil.loadImage(B['imgpath'], color='gray')
+    IM = ioutil.loadImage(B['imgpath'], color=color)
     PosIm = extractWindowsFromImage(IM, B['PosBBox'])
     NegIm = extractWindowsFromImage(IM, B['NegBBox'])
-    outpath = os.path.join(datapath, 'gray')
+    outpath = os.path.join(datapath, color)
     mkpath(outpath)
     outpath = os.path.join(outpath, str(B['basename'])+'.npz')
     np.savez_compressed(outpath, PosIm=PosIm, NegIm=NegIm, **B)
@@ -43,6 +45,22 @@ hogParams = dict(
   pixels_per_cell=(5,5),
   cells_per_block=(1,1),
   )
+
+def extractHOGForDataset(datapath, color='gray'):
+  bboxFiles = glob.glob(os.path.join(datapath, '*.npz'))
+  for curpath in bboxFiles:
+    B = np.load(curpath)
+    IM = ioutil.loadImage(B['imgpath'], color=color)
+    PosIm = extractWindowsFromImage(IM, B['PosBBox'])
+    NegIm = extractWindowsFromImage(IM, B['NegBBox'])
+    PosFeat = extract_hog_for_imageset(PosIm)
+    NegFeat = extract_hog_for_imageset(NegIm)
+    outpath = os.path.join(datapath, 'hog')
+    mkpath(outpath)
+    outpath = os.path.join(outpath, str(B['basename'])+'.npz')
+    np.savez_compressed(outpath, Pos=PosFeat, Neg=NegFeat, **B)
+
+
 
 def extract_hog_features_for_dataset(setName, window_shape=(25,25)):
   nImages = ioutil.get_num_images(setName)

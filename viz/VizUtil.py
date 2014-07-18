@@ -7,7 +7,7 @@ DEFAULTSAVEPATH='/data/burners/figures/'
 def imshow( Im, block=False, figID=1):
   figH = pylab.figure(num=figID)
   figH.clf()
-  pylab.imshow(np.uint8(Im))
+  pylab.imshow(Im)
   pylab.draw()
   pylab.show(block=block)
 
@@ -20,7 +20,11 @@ def show_examples( PMat, Ktop=9, block=False, figID=1):
   Kplot = np.minimum(PMat.shape[0], Ktop)
   for kk in range(Kplot):
     pylab.subplot(nRow, nCol, kk+1)
-    pylab.imshow(np.uint8(PMat[kk]), interpolation='nearest')
+    if PMat[kk].ndim == 3:
+      pylab.imshow(PMat[kk], interpolation='nearest')
+    else:
+      pylab.imshow(PMat[kk], interpolation='nearest', cmap='gray')
+
     pylab.axis('image')
     pylab.xticks([])
     pylab.yticks([])
@@ -41,8 +45,8 @@ def save_fig_as_png(savepath, figID=1):
   pylab.savefig(savepath, bbox_inches = 'tight', pad_inches = 0)
 
 def show_image_with_bbox(Im, BBox, BBox2=None, 
-                             boxcolor=[255,255,0],
-                             boxcolor2=[0,255,0],
+                             boxcolor=[1,1,0],
+                             boxcolor2=[0,1,0],
                              block=False):
   ''' Plot color image with bounding boxes shown
   '''

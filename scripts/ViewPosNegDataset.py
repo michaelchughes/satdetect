@@ -12,51 +12,47 @@ import satdetect.viz as viz
 
 def main():
   parser = argparse.ArgumentParser()
-  parser.add_argument('setName', type=str)
+  parser.add_argument('datapath', type=str)
   parser.add_argument('label', type=str, default='neg')
-  parser.add_argument('--imageID', type=int, default=1)
-  parser.add_argument('--pstart', type=int, default=0)
-  parser.add_argument('--nstart', type=int, default=0)
+  parser.add_argument('--startID', type=int, default=0)
   parser.add_argument('--Ktop', type=int, default=16)
-  parser.add_argument('--window_shape', type=str, default='25,25')
   args = parser.parse_args()
-  ArgParseUtil.parse_window_shape_inplace(args)
 
-  P, N = ioutil.load_labeled_images(args.setName, args.imageID,
-                                    args.window_shape, 'rgb')
-    
-  pstart = args.pstart
-  nstart = args.nstart
+  Q = np.load(args.datapath)
+  assert 'PosIm' in Q and 'NegIm' in Q
+
+  if args.label.count('pos') > 0:
+    Im = Q['PosIm']
+    Smax = Im.shape[0]
+  else:
+    Im = Q['NegIm']
+    Smax = Im.shape[0]
+
+  s = args.startID
   while 1:
-    #viz.pylab.close('all')
-    print 'p %5d/%d | n %5d' % (pstart, P.shape[0], nstart)
-    if args.label.count('pos') > 0:
-      viz.show_examples(P[pstart:], Ktop=args.Ktop, figID=1)
-    elif args.label.count('jitter') > 0:
-      viz.show_examples(PJ[pstart:], Ktop=args.Ktop, figID=1)
-    else:
-      viz.show_examples(N[nstart:], Ktop=args.Ktop, figID=2)
+    s = np.maximum(0, np.minimum(Im.shape[0]-args.Ktop, s))
+    print 'items %d-%d' % (s, s+args.Ktop-1)
+
+    viz.show_examples(Im[s:], Ktop=args.Ktop, figID=1)
     try:
       keypress = raw_input('Press any key >>')
     except KeyboardInterrupt:
       sys.exit(1)
     if os.path.exists(keypress):
-      savefile = os.path.join(keypress, 'image%02d-%s.png' % (args.imageID, args.label))
+      savefile = os.path.join(keypress, 
+                              'image%02d-%s.png' % (args.imageID, args.label))
       pylab.savefig(savefile, bbox=0)
       print 'SAVED TO:', savefile
     if keypress.count('exit') > 0:
       sys.exit(1)
-
     try:
-      nstart = int(keypress)
+      s = int(keypress)
     except:
       pass
+
     if len(keypress) == 0:
-      nstart += args.Ktop
-      pstart += args.Ktop
+      s += args.Ktop
 
-    nstart = np.maximum(0, np.minimum(N.shape[0]-args.Ktop, nstart))
-    pstart = np.maximum(0, np.minimum(P.shape[0]-args.Ktop, pstart))
-
+    
 if __name__ == '__main__':
   main()
