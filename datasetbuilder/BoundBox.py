@@ -71,6 +71,9 @@ def convert_pos_bbox_to_standard_size(PBox, window_shape=(25,25)):
            each row gives [ymin, ymax, xmin, xmax] pixel coords
 
   '''
+  if PBox.ndim == 1:
+    assert PBox.size == 4
+    PBox = PBox[np.newaxis,:]
   H, W = window_shape
   SBox = np.zeros_like(PBox)
   for rowID in xrange(PBox.shape[0]):

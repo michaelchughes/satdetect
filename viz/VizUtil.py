@@ -1,6 +1,7 @@
 import numpy as np
 from matplotlib import pylab
 import os
+import skimage.color
 
 DEFAULTSAVEPATH='/data/burners/figures/'
 
@@ -50,17 +51,21 @@ def show_image_with_bbox(Im, BBox, BBox2=None,
                              block=False):
   ''' Plot color image with bounding boxes shown
   '''
-  AIm = Im.copy() # annotation shouldn't happen to original array
+  if Im.ndim < 3:
+    AIm = skimage.color.gray2rgb(Im)
+  else:
+    AIm = Im.copy() # annotation shouldn't happen to original array
   _add_bbox_to_im_inplace(AIm, BBox, boxcolor)
   _add_bbox_to_im_inplace(AIm, BBox-1, boxcolor)
   _add_bbox_to_im_inplace(AIm, BBox+1, boxcolor)
   if BBox2 is not None:
     _add_bbox_to_im_inplace(AIm, BBox2, boxcolor2)
   imshow(AIm, figID=1, block=block)
+  return AIm
   
 def _add_bbox_to_im_inplace(Im, BBox, boxcolor):
   boxcolor = np.asarray(boxcolor)
-  if Im.max() < 1:
+  if boxcolor.max() > 1:
     boxcolor = boxcolor / 255
   for r in xrange(BBox.shape[0]):
     Im[ BBox[r,0]:BBox[r,1], BBox[r,2]] = boxcolor[np.newaxis,:]

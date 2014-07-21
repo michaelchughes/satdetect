@@ -13,6 +13,88 @@ import warnings
 import satdetect.ioutil as ioutil
 import satdetect.viz as viz
 
+
+def trainClassifier(classifierType, Train):
+  '''
+      Args
+      ----------
+      Train : dict with fields
+              X : training data. 2D array, size Ntrain x D
+                    each row is a feature vector
+              Y : training labels, 1D array, size Ntrain
+
+      Returns
+      ---------
+      C : trained classifier object
+  '''
+  Xtrain = Train['X']
+  Ytrain = Train['Y']
+  assert Xtrain.shape[0] == Ytrain.size
+
+  if classifierType == 'RandomForest':
+    C = RandomForestClassifier(n_estimators=10, max_depth=None,
+                             min_samples_leaf=10, random_state=0)
+    C.fit(Xtrain, Ytrain)
+  elif classifierType == 'Logistic':
+    C = LogisticRegression(penalty='l2', C=1.0)
+    C.fit(Xtrain, Ytrain)
+  elif classifierType == 'NearestNeighbor1':
+    C = KNeighborsClassifier(n_neighbors=1, algorithm='brute')
+    C.fit(Xtrain, Ytrain)
+  elif classifierType == 'NearestNeighbor3':
+    C = KNeighborsClassifier(n_neighbors=3, algorithm='brute')
+    C.fit(Xtrain, Ytrain)
+  else:
+    raise NotImplementedError('Not recognized' + classifierType)
+  return C
+
+def testClassifier(C, Data):
+  '''
+  '''
+  Phat = C.predict_proba(Data['X'])
+  if Phat.ndim > 1:
+    Phat = Phat[:,-1] # use final column, which is probability of 1
+  assert Phat.min() >= 0
+  assert Phat.max() <= 1.0
+
+  Ytest = Data['Y']
+
+  ## Loop over thresholds that give distinct False Negative counts
+  thrVals = np.unique(Phat[Ytest == 1])
+  FNmax = np.sum(Ytest)/2
+  FNvals = np.arange(FNmax)
+  thrVals = thrVals[:FNmax]
+  for decisionThresh in thrVals:
+    Yhat = np.asarray(Phat >= decisionThresh, dtype=Ytest.dtype)
+    nCorrect = np.sum(Yhat == Ytest)
+    nTotal = Ytest.size
+    acc = nCorrect / float(nTotal)
+  
+    TP = np.sum(np.logical_and(Ytest == 1, Yhat == 1))
+    TN = np.sum(np.logical_and(Ytest == 0, Yhat == 0))
+
+    falseNegMask = np.logical_and(Ytest == 1, Yhat == 0)
+
+    falsePosMask = np.logical_and(Ytest == 0, Yhat == 1)
+    falsePosIDs = np.flatnonzero(falsePosMask)
+    sortIDs = np.argsort(-1*Phat[falsePosIDs])
+    falsePosIDs = falsePosIDs[sortIDs]
+
+    FP = np.sum(falsePosMask)
+    FN = np.sum(falseNegMask)
+
+    msg  = 'FN:%3d/%d   '  % (FN, TP+FN)
+    msg += 'FP:%3d/%d   '  % (FP, TN+FP)
+    msg += 'acc:%3d/%3d %.3f   ' % (nCorrect, nTotal, acc)
+    msg += ' %.2f' % (decisionThresh)
+    print msg
+
+    #print falsePosIDs[:5] - np.sum(Ytest) # pos examples before neg ones
+
+  return FNvals, thrVals
+
+
+
 def trainAndMakePredictions(classifierType, Train, Test, baseline=None, **kwargs):
   Xtrain, Ytrain = Train
   Xtest, Ytest = Test
