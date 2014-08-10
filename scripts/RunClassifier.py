@@ -22,6 +22,9 @@ def main():
   else:
     Test = makeXYDataset(os.path.join(args.dpath, '*.npz'), args.testNames)
 
+  if Test is None:
+    raise ValueError("Test dataset should not be None.")
+
   classifier.testClassifier(C, Test)
 
 

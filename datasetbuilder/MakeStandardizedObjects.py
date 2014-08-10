@@ -56,6 +56,7 @@ def makeAndSaveAllStdObjects(datapath, window_shape=(25,25),
     np.savez_compressed(fpath, PosBBox=PosBBox, NegBBox=NegBBox,
                                imgpath=curimgpath,
                                basename=basename)
+    print "Wrote PosBBox and NegBBox to file: ", fpath
 
     
     

@@ -1,4 +1,10 @@
 '''
+
+Example
+----------
+python TrainClassifier.py \
+   /data/tukuls/Sudan/
+
 '''
 import argparse
 from distutils.dir_util import mkpath
@@ -25,6 +31,8 @@ def main():
                                          args.holdoutNames)
   C = classifier.trainClassifier(args.classifier, Train)
 
+  print ''
+  print 'Classifier Performance on Training Data'
   classifier.testClassifier(C, Train)
 
   print 'Saved trained classifier to %s' % (args.cpath)

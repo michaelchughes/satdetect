@@ -1,4 +1,12 @@
 '''
+
+Usage
+--------
+python ExtractFeatForDataset.py <path to huts-25x25 folder> <feature name>
+
+Example
+--------
+python ExtractFeatForDataset.py /data/tukuls/Yida/xfeatures/huts-25x25/ hog
 '''
 import argparse
 

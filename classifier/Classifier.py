@@ -8,6 +8,7 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.naive_bayes import GaussianNB
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.svm import SVC
 import warnings
 
 import satdetect.ioutil as ioutil
@@ -15,7 +16,8 @@ import satdetect.viz as viz
 
 
 def trainClassifier(classifierType, Train):
-  '''
+  ''' Train classifier on provided dataset
+
       Args
       ----------
       Train : dict with fields
@@ -30,38 +32,44 @@ def trainClassifier(classifierType, Train):
   Xtrain = Train['X']
   Ytrain = Train['Y']
   assert Xtrain.shape[0] == Ytrain.size
+  assert Xtrain.ndim == 2
+  assert Ytrain.ndim == 1
+  assert len(np.unique(Ytrain)) == 2
 
-  if classifierType == 'RandomForest':
+  classifierType = classifierType.lower()
+  if classifierType == 'randomforest':
     C = RandomForestClassifier(n_estimators=10, max_depth=None,
                              min_samples_leaf=10, random_state=0)
-    C.fit(Xtrain, Ytrain)
-  elif classifierType == 'Logistic':
+  elif classifierType == 'logistic':
     C = LogisticRegression(penalty='l2', C=1.0)
-    C.fit(Xtrain, Ytrain)
-  elif classifierType == 'NearestNeighbor1':
+  elif classifierType == 'nearestneighbor1':
     C = KNeighborsClassifier(n_neighbors=1, algorithm='brute')
-    C.fit(Xtrain, Ytrain)
-  elif classifierType == 'NearestNeighbor3':
+  elif classifierType == 'nearestneighbor3':
     C = KNeighborsClassifier(n_neighbors=3, algorithm='brute')
-    C.fit(Xtrain, Ytrain)
+  elif classifierType == 'svm-rbf':
+    C = SVC(C=1.0, kernel='rbf', probability=True)
+  elif classifierType == 'svm-linear':
+    C = SVC(C=1.0, kernel='linear', probability=True)
   else:
-    raise NotImplementedError('Not recognized' + classifierType)
+    raise NotImplementedError('Not recognized: ' + classifierType)
+
+  ## Train the classifier!
+  C.fit(Xtrain, Ytrain)
   return C
 
 def testClassifier(C, Data):
-  '''
+  ''' Apply pre-trained classifier to provided dataset
   '''
   Phat = C.predict_proba(Data['X'])
   if Phat.ndim > 1:
     Phat = Phat[:,-1] # use final column, which is probability of 1
   assert Phat.min() >= 0
   assert Phat.max() <= 1.0
-
   Ytest = Data['Y']
 
   ## Loop over thresholds that give distinct False Negative counts
   thrVals = np.unique(Phat[Ytest == 1])
-  FNmax = np.sum(Ytest)/2
+  FNmax = np.maximum(10, np.sum(Ytest)/2)
   FNvals = np.arange(FNmax)
   thrVals = thrVals[:FNmax]
   for decisionThresh in thrVals:
@@ -86,15 +94,13 @@ def testClassifier(C, Data):
     msg  = 'FN:%3d/%d   '  % (FN, TP+FN)
     msg += 'FP:%3d/%d   '  % (FP, TN+FP)
     msg += 'acc:%3d/%3d %.3f   ' % (nCorrect, nTotal, acc)
-    msg += ' %.2f' % (decisionThresh)
+    msg += ' %.3f' % (decisionThresh)
     print msg
-
-    #print falsePosIDs[:5] - np.sum(Ytest) # pos examples before neg ones
 
   return FNvals, thrVals
 
 
-
+"""
 def trainAndMakePredictions(classifierType, Train, Test, baseline=None, **kwargs):
   Xtrain, Ytrain = Train
   Xtest, Ytest = Test
@@ -176,3 +182,4 @@ def evalPredictions(Phat, Test, TestImages, args, testIDs, decisionThresh=0.5):
     print falsePosIDs[:5] - np.sum(Ytest) # pos examples before neg ones
 
   return FNvals, thrVals
+"""

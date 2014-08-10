@@ -199,6 +199,43 @@ def prettyprint_pixel_bbox(SDict):
   return '%.0f %.0f %.0f %.0f' % (SDict['yMin'], SDict['yMax'],
                                   SDict['xMin'], SDict['xMax'])
 
+def calcResolutionFromFiles(llfile, pxfile):
+  LBox = np.loadtxt(llfile)
+  PBox = np.loadtxt(pxfile)
+  Hpx = PBox[1]
+  Wpx = PBox[3]
+  Hm = calcDistBetweenLatLongPair(LBox[0], LBox[2], LBox[1], LBox[2])
+  Wm = calcDistBetweenLatLongPair(LBox[0], LBox[2], LBox[0], LBox[3])
+  print "H x W (pixels): %6.1f x %6.1f" % (Hpx, Wpx)
+  print "H x W (meters): %6.1f x %6.1f" % (Hm, Wm)
+  print "H x W (m/px):   %6.2f x %6.2f" % (Hm/Hpx, Wm/Wpx)
+
+def determineMetersPerPixelResolution(SDict, H, W):
+  pass
+
+def calcDistBetweenLatLongPair(latA, lonA, latB, lonB):
+  ''' Calculate dist between two pairs of lat/long coordinates
+
+      Returns
+      -------
+      distance (in meters)
+  '''
+  ## Source: http://nssdc.gsfc.nasa.gov/planetary/factsheet/earthfact.html
+  R_earth = 6378.1 * 1000 
+  #R_earth = 6371
+
+  phiA = degToRad(latA)
+  phiB = degToRad(latB)
+  deltaLat = degToRad(latB - latA)
+  deltaLon = degToRad(lonB - lonA)
+
+  a = np.sin(deltaLat/2)**2 \
+      + np.cos(phiA) * np.cos(phiB) * np.sin(deltaLon/2)**2
+  c = 2 * np.arctan2( np.sqrt(a), np.sqrt(1-a))
+  return R_earth * c
+
+def degToRad(deg):
+  return np.pi / 180 * deg
 
 if __name__ == '__main__':
   parser = argparse.ArgumentParser()
@@ -208,5 +245,4 @@ if __name__ == '__main__':
 
 
   Scenes = ReadScenesWithXObjectsFromKML(args.kmlfilepath)
-  from IPython import embed; embed()
-  #WriteScenesWithXObjectsToFile(Scenes, args.outpath)
+  WriteScenesWithXObjectsToFile(Scenes, args.outpath)

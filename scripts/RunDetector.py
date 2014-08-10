@@ -71,9 +71,8 @@ def main():
                                                 args.window_shape, 
                                                 args.stride)
         X = featextractor.extract_hog_for_imageset(WMat)
-
-        print 'Tile %d/%d done' % (tileID, nRow*nCol)
-        print TBox
+        nTrue = TBox.shape[0]
+        print 'Tile %d/%d done. %d true objects.' % (tileID, nRow*nCol, nTrue)
         outpath = os.path.join(tmppath, 'tile%02d.dump' % (tileID))
         joblib.dump(dict(imgpath=args.imgpath,
                          X=X, BBox=BBox, TBox=TBox, TileIm=Tile), outpath)
@@ -83,13 +82,16 @@ def main():
     Q = joblib.load(tilepath)
     
     Phat = C.predict_proba(Q['X'])[:, -1] # final column = Pr(item in class 1)
-    print Phat.max()
     mask = Phat > args.thresh
     BBoxOn=Q['BBox'][mask]
     AIm = viz.show_image_with_bbox(Q['TileIm'], BBoxOn, Q['TBox'], block=0)
     
     outpath = tilepath.replace('.dump', '.jpg')
     imsave(outpath, AIm)
+
+    nTotal = Q['X'].shape[0]
+    print '%6d /%6d detections' % (np.sum(mask), nTotal)
+  from IPython import embed; embed()
 
 if __name__ == '__main__':
   main()

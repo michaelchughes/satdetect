@@ -4,6 +4,17 @@ import numpy as np
 import satdetect.ioutil as ioutil
 
 def makeTrainAndTestDatasets(datapath, testNames):
+  ''' Load all stored features from scene files in specified directory.
+
+      Returns
+      --------
+      Train : dict definining Train dataset, with fields
+              X : features, 2D array, size N x D
+              Y : labels, 1D array, size N
+              BBox : bounding boxes, 2D array, size N x 4
+              imgpath : full file paths, list, size N 
+      Test : dict defining Test dataset, or None if no test data specified
+  '''
   if type(testNames) == list:
     testNames = set(testNames)
   elif type(matchNames) == str:
@@ -14,11 +25,19 @@ def makeTrainAndTestDatasets(datapath, testNames):
   testList = list()
   for fpath in featFileList:
     if isMatchByFilename(fpath, testNames):
-      trainList.append(fpath)
-    else:
       testList.append(fpath)
+    else:
+      trainList.append(fpath)
+  if len(trainList) == 0:
+    raise ValueError('No training data found')
   Train = makeXYDataset(trainList)
-  Test = makeXYDataset(testList)
+  printDataSummary(trainList, Train, "Train")
+
+  if len(testList) > 0:
+    Test = makeXYDataset(testList)
+    printDataSummary(testList, Test, "Test")
+  else:
+    Test = None
   return Train, Test
 
 def makeXYDataset(fileList, matchNames=''):
@@ -38,7 +57,6 @@ def makeXYDataset(fileList, matchNames=''):
   for fpath in fileList:
     if len(matchNames) > 0 and not isMatchByFilename(fpath, matchNames):
       continue
-    print fpath
     Q = np.load(fpath)
     X = np.vstack([Q['Pos'], Q['Neg']])
     B = np.vstack([Q['PosBBox'], Q['NegBBox']])
@@ -61,37 +79,12 @@ def isMatchByFilename(fpath, matchNames):
       return True
   return False
 
-"""
-def make_dataset(setName, featName, window_shape, imageIDs):
-  ''' Create dataset with pos/neg examples pooled from many images
+def printDataSummary(fileList, Data, Name):
+  ''' Print human-readable summary of a dataset
   '''
-  nImages = ioutil.get_num_images(setName)
-  
-  PosList = list()
-  NegList = list()
-  nNeg = 0
-  for imageID in imageIDs:
-    assert imageID > 0
-    assert imageID <= nImages
-
-    Pos, Neg = ioutil.load_labeled_feats(setName, imageID, window_shape, featName)
-    PosList.append(Pos)
-    NegList.append(Neg)
-    nNeg += Neg.shape[0]
-
-  X = np.vstack([np.vstack(PosList), np.vstack(NegList)])
-  Y = np.ones(X.shape[0], dtype=np.int32)
-  Y[-nNeg:] = 0
-  return X, Y
-
-def make_images_for_dataset(setName, window_shape, imageIDs):
-  PosList = list()
-  NegList = list()
-  for imageID in imageIDs:
-    P, N = ioutil.load_labeled_images(setName, imageID,
-                                      window_shape, 'rgb')
-    PosList.append(P)
-    NegList.append(N)
-
-  return np.vstack([np.vstack(PosList), np.vstack(NegList)])
-"""
+  print Name
+  for tpath in fileList:
+    print '  %s' % (tpath.split(os.path.sep)[-1])
+  print ' Stats:'
+  print '  %6d pos' % (np.sum(Data['Y']==1))
+  print '  %6d neg' % (np.sum(Data['Y']==0))
