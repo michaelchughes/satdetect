@@ -1,0 +1,15 @@
+		<GroundOverlay>
+			<name>SCENENAME</name>
+			<open>1</open>
+			<Icon>
+				<href>IMFILE</href>
+				<viewBoundScale>0.75</viewBoundScale>
+			</Icon>
+			<LatLonBox>
+				<north>NORTH</north>
+				<south>SOUTH</south>
+				<east>EAST</east>
+				<west>WEST</west>
+				<rotation>ROTATION</rotation>
+			</LatLonBox>
+		</GroundOverlay>
