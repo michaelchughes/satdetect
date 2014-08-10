@@ -1,13 +1,13 @@
 '''
 ParseKMLIntoXObjects.py
 
-Command-line script for converting KML file spec into flat-file format
+Command-line script for converting KML annotations into flat-file format
 
 Examples
 --------
 $$ python ParseKMLIntoXObjects.py \
-              /data/tukuls/Sudan/raw/doc.kml \ # input kml spec
-              /data/tukuls/Sudan/xobjects/     # output location
+              /data/tukuls/Sudan/data/doc.kml \ # input kml spec
+              /data/tukuls/Sudan/data/     # output location
 
 
 '''
@@ -72,7 +72,13 @@ def WriteScenesWithXObjectsToFile(Scenes, outpath):
 
     ## Make copy of image source file, for easy access
     destpath = os.path.join(outpath, Scene['name'] + '.jpg')
-    shutil.copyfile(Scene['imgfile'], destpath)
+    try:
+      shutil.copyfile(Scene['imgfile'], destpath)
+    except Exception as e:
+      if str(e).count("same file"):
+        pass
+      else:
+        raise e
 
     ## Read in the image (as grayscale) to obtain correct pixel sizes
     img = imread(destpath, flatten=True) 
@@ -189,6 +195,19 @@ def convert_latlong_to_pixel_bbox(H, W, Scene, item):
     return np.round(xScale * (lon - Scene['lonMin']))
   return dict(xMin=lon2x(item['lonMin']), xMax=lon2x(item['lonMax']),
               yMin=lat2y(item['latMax']), yMax=lat2y(item['latMin'])
+             )
+
+def convert_pixel_to_latlong_bbox(H, W, Scene, item):
+  ''' Convert pixel bbox to latlong bbox, using Scene bounds
+  '''
+  yScale = float(H) / (Scene['latMax'] - Scene['latMin'])
+  xScale = float(W) / (Scene['lonMax'] - Scene['lonMin'])
+  def y2lat(y):
+    return Scene['latMin'] + float(H - y)/yScale
+  def x2lon(x):
+    return Scene['lonMin'] + float(x)/xScale
+  return dict(lonMin=x2lon(item['xMin']), lonMax=x2lon(item['xMax']),
+              latMin=y2lat(item['yMax']), latMax=y2lat(item['yMin'])
              )
 
 def prettyprint_latlong_bbox(SDict):
