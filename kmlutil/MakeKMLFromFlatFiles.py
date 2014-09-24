@@ -4,12 +4,14 @@ import sys
 import numpy as np
 import glob
 
+TDIR = '../templates/'
+
 def loadTemplates():
   T = dict()
-  T['header'] = readFileIntoStr('../TEMPLATEHeader.kml')
-  T['stylemap'] = readFileIntoStr('../TEMPLATEStyleMap.kml')
-  T['placemark'] = readFileIntoStr('../TEMPLATEPlacemark.kml')
-  T['imgoverlay'] = readFileIntoStr('../TEMPLATEImageOverlay.kml')
+  T['header'] = readFileIntoStr(TDIR + 'TEMPLATEHeader.kml')
+  T['stylemap'] = readFileIntoStr(TDIR + 'TEMPLATEStyleMap.kml')
+  T['placemark'] = readFileIntoStr(TDIR + 'TEMPLATEPlacemark.kml')
+  T['imgoverlay'] = readFileIntoStr(TDIR + 'TEMPLATEImageOverlay.kml')
   return T
 
 def readFileIntoStr(fpath):
@@ -49,24 +51,33 @@ def pxvec2dict(pxvec):
 def abspath2basename(fpath):
   return fpath.split(os.path.sep)[-1].split('.')[0]
 
-def mkKML(path, outkmlfile):
+def mkKML(path, outkmlfile, px2ll=False):
   ''' Write information from the flatfiles in path to provided outkmlfile
   '''
-  pxbbox2llbbox(path)
+  if px2ll:
+    pxbbox2llbbox(path)
   dataname = abspath2basename(outkmlfile)
+
+  print dataname
 
   T = loadTemplates()
   kmlstr = T['header'].replace('DATANAME', dataname)
   kmlstr += T['stylemap']
   kmlstr += "<Folder>"
   sceneList = glob.glob(os.path.join(path, '*.jpg'))
+  print sceneList
+
   for spath in sorted(sceneList):
     basename = abspath2basename(spath)
+    print spath
+    print basename
+
     imgoverlay = '' + T['imgoverlay']
     imgoverlay = imgoverlay.replace('SCENENAME', basename)
     imgoverlay = imgoverlay.replace('IMFILE', basename + '.jpg')
 
     LL = loadLatLonForImage(spath.replace('.jpg', '.llbbox'))
+    print LL
     for key in LL:
       imgoverlay = imgoverlay.replace(key, '%.16f' % (LL[key]))
     kmlstr += imgoverlay
