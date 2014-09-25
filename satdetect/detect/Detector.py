@@ -51,7 +51,7 @@ def runDetector(C, DInfo, decisionThr=0.5, **kwargs):
     imoutpath = os.path.join(outpath, imfile)
     skimage.io.imsave(imoutpath, Im)
     if tileID == 0:
-      print 'Saved annotated image to:'
+      print 'Saving annotated image tiles...'
     print imoutpath
 
 def makeImageWithDetectedBBoxes(tilepath, RInfo, **kwargs):

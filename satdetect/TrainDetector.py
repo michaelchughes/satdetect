@@ -1,10 +1,14 @@
+import argparse
 import glob
+import os
 
+from satdetect.ioutil import imgpath2list
 from satdetect.featextract import WindowExtractor, HOGFeatExtractor
 from satdetect.detect import BasicTrainSetBuilder, Classifier
 
 
-def trainDetector(imgpath, outpath, 
+def trainDetector(imgpath='', outpath='',
+                  feat='hog',
                   cname='logistic',
                   **kwargs):
   ''' Train a detector on imagery in imgpath, save results to outpath
@@ -13,12 +17,8 @@ def trainDetector(imgpath, outpath,
       --------
       C : trained classifier for individual windows
   '''
-  if type(imgpath) == list:
-    imgpathList = imgpath
-  elif imgpath.count('*') > 0:
-    imgpathList = glob.glob(imgpath)
-  else:
-    imgpathList = [imgpath]
+  imgpathList = imgpath2list(imgpath)
+
   DInfo = dict()
   DInfo['imgpathList'] = imgpathList
   DInfo['outpath'] = outpath
@@ -26,6 +26,7 @@ def trainDetector(imgpath, outpath,
   ## Break up satellite image into 25x25 pixel windows
   WindowExtractor.transform(DInfo) 
 
+  ## TODO: add options for other features
   ## Extract HOG feature vector for each window
   featExtractor = HOGFeatExtractor()
   featExtractor.transform(DInfo)
@@ -40,6 +41,13 @@ def trainDetector(imgpath, outpath,
   Classifier.testClassifier(C, DInfo)
 
 if __name__ == "__main__":
-  imgpath = '/data/tukuls/sudan/data/scene1.jpg'
-  outpath = '/data/tukuls/sudan/xfeatures/huts_25x25_stride4/'
-  trainDetector(imgpath, outpath)
+  parser = argparse.ArgumentParser()
+  parser.add_argument('imgpath', type=str,
+                      help='path(s) to load training images from')
+  parser.add_argument('outpath', type=str,
+                      help='path where results are saved')
+  parser.add_argument('--cname', type=str,
+                      help='name of classifier',
+                      choices=['logistic', 'svm-linear', 'svm-rgb'])
+  args = parser.parse_args()
+  trainDetector(**args.__dict__)

@@ -8,6 +8,32 @@ import scipy.io
 from skimage.data import imread
 from distutils.dir_util import mkpath
 
+def imgpath2list(imgpath):
+  ''' Transform provided path (or path pattern) into a list of valid paths
+
+      Args
+      -------
+      imgpath : list or string
+      either exact jpeg path ('/path/to/myfile.jpg')
+      or pattern to be read by glob ('/path/to/manyfiles/*.jpg')
+
+      Returns
+      --------
+      imgpathList : list of valid paths on this system
+  '''
+  ## Remove backslashes from imgpath, 
+  ## since these are sometimes added by terminal
+  if type(imgpath) == str:
+    imgpath = imgpath.replace('\\', '')
+
+  if type(imgpath) == list:
+    imgpathList = imgpath
+  elif imgpath.count('*') > 0:
+    imgpathList = glob.glob(imgpath)
+  else:
+    imgpathList = [imgpath]
+  return imgpathList
+
 def getFilepathParts(path):
   ''' Transform string defining a filesystem absolute path into component parts
 

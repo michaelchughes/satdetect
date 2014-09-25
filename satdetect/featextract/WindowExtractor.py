@@ -3,6 +3,7 @@ import glob
 import numpy as np
 from scipy.spatial.distance import cdist
 import skimage
+import hashlib
 
 from satdetect.ioutil import loadImage, getFilepathParts, mkpath
 
@@ -27,6 +28,11 @@ def transform(DataInfo, **kwargs):
       ---------
       DataInfo dict, updated in-place.
   '''
+  ## Unique identifier for this training data
+  ustring = ''.join(DataInfo['imgpathList'])
+  uid = int(hashlib.md5(ustring).hexdigest(), 16) % 10000
+  DataInfo['trainuname'] = '%04d' % (uid)
+
   print '<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< This is WindowExtractor.transform'
   tilepathList = list()
   for imgpath in DataInfo['imgpathList']:
@@ -105,13 +111,19 @@ def extractWindowsFromImage(imgpath, outpath,
 
       print '  Building Tile %d...' % (tileID)
 
-      ## Make the tile and the windows
+      ## Make the tile from the large image
       GrayTile = GrayIm[yl:yh, xl:xh].copy()
       if ColorIm is None:
         ColorTile = None
       else:
         ColorTile = ColorIm[yl:yh, xl:xh, :].copy()
       
+      ## Extract the windows, with corresponding bounding boxes
+      # WIm : 2D array, Nwindows x window_shape
+      # WBox : 2D array, Nwindows x 4
+      # WBox provides bbox in tile-specific coordinates [min=0, max=S]
+      # BBox : 2D array, Nwindows x 4
+      # BBox provides bbox in whole-image coordinates [min=0, max=GrayIm.shape]
       WIm, WBox = extractWindowsWithBBox(GrayTile, window_shape, stride)
       BBox = WBox.copy()
       BBox[:, [0,1]] += yl

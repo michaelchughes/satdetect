@@ -74,11 +74,15 @@ def _add_bbox_to_im_inplace(Im, BBox, boxcolor, doThickLines=1):
     Im[BBox[r,0], BBox[r,2]:BBox[r,3]] = boxcolor[np.newaxis,:]
     Im[BBox[r,1]-1, BBox[r,2]:BBox[r,3]] = boxcolor[np.newaxis,:]
 
-  ## Draw thick lines by repeating this cmd with slightly shifted BBox coords
+  ## Draw thick lines by repeating this cmd 
+  ## but slightly shifting BBox coords +1 or -1 pixel
   if doThickLines:
-    _add_bbox_to_im_inplace(Im, BBox-1, boxcolor, doThickLines=0)
-    _add_bbox_to_im_inplace(Im, BBox+1, boxcolor, doThickLines=0)
-
+    for inc in [-1, +1]:
+      ABox = BBox + inc
+      np.maximum(ABox, 0, out=ABox)
+      np.minimum(ABox[:,1], Im.shape[0], out=ABox[:,1])
+      np.minimum(ABox[:,3], Im.shape[1], out=ABox[:,3])
+      _add_bbox_to_im_inplace(Im, ABox, boxcolor, doThickLines=0)
     
 """
 def showMostConfidentFalseNegatives(Ytrue, Phat, Nsubplots=9):

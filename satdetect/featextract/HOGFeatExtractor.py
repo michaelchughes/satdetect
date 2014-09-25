@@ -29,10 +29,13 @@ class HOGFeatExtractor(object):
     '''
     print '<<<<<<<<<<<<<<<<<<<<<<<<<<<< This is HOGFeatExtractor.transform'
 
+    ## Unique string identifying this feature extractor
+    DataInfo['featuname'] = str(self)
+
     featpathList = list()
     for path in DataInfo['tilepathList']:
       pathdir, basename, ext = getFilepathParts(path)
-      outpath = os.path.join(pathdir, str(self))
+      outpath = os.path.join(pathdir, DataInfo['featuname'])
       mkpath(outpath)
       outfile = os.path.join(outpath, basename + ext)      
 
@@ -59,6 +62,7 @@ class HOGFeatExtractor(object):
       np.savez(outfile, Feat=FeatMat, Y=WindowInfo['Y'],
                         imgpath=WindowInfo['imgpath'],
                         tilepath=path)
+
 
     DataInfo['featpathList'] = featpathList
     return DataInfo

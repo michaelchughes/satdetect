@@ -55,8 +55,12 @@ def trainClassifier(Train, cname='logistic'):
   else:
     raise NotImplementedError('Not recognized: ' + cname)
   
+  ## Unique name for classifier pipeline
+  ## must uniquely identify the training set + features + classifier
+  uname = '%s-%s-%s' % (Train['trainuname'], Train['featuname'], cname)
+  Train['pipelineuname'] = uname
+
   ## Train the classifier!
-  C.cname = cname
   C.fit(Xtrain, Ytrain)
   elapsedtime = time.time() - stime
 
@@ -109,13 +113,17 @@ def testClassifier(C, Data):
 
 def saveClassifier(C, DInfo):
   ''' Save classifier to disk, using prescribed location in DInfo['outpath']
+
+      Returns
+      --------
+      None. Classifier object serialized to disk using joblib.dump.
   '''
   print '<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< This is Classifier.saveClassifier'
   outpath = DInfo['outpath']
   outpath = os.path.join(outpath, 'trained-classifiers')
   mkpath(outpath)
-
-  outpathfile = os.path.join(outpath, C.cname + '.dump')
+    
+  outpathfile = os.path.join(outpath, DInfo['pipelineuname'] + '.dump')
   SaveVars = dict(ClassifierObj=C, TrainDataInfo=DInfo)
   joblib.dump(SaveVars, outpathfile)
   print 'Classifier and TrainDataInfo saved to:'
