@@ -64,13 +64,16 @@ def makeImageWithDetectedBBoxes(tilepath, RInfo, **kwargs):
   estPosIDs = np.flatnonzero(RInfo['Yhat'] > 0)
 
   TileInfo = np.load(tilepath)
-  ColorIm = TileInfo['ColorIm']
+  if 'ColorIm' in TileInfo and TileInfo['ColorIm'].ndim > 0:
+    Im = TileInfo['ColorIm']
+  else:
+    Im = TileInfo['GrayIm']
 
   ## Grab subset of all rows in the BBox matrix that were assigned pos labels
   estPosBBox = TileInfo['TileBBox'][estPosIDs]
   truePosBBox = TileInfo['curPosBBox']
 
-  Im = makeImageWithBBoxAnnotations(ColorIm, truePosBBox, estPosBBox)
+  Im = makeImageWithBBoxAnnotations(Im, truePosBBox, estPosBBox)
   return Im
 
 def applyDetectorToImageTileFeats(featpath, C, DInfo,
