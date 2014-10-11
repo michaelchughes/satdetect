@@ -62,6 +62,7 @@ def transform(DataInfo, nNegPerTile=5000):
       Y = np.hstack([Y, curY])
     N = Y.size
 
+  print Y
   print 'Dataset stats:'
   print ' pos examples %d' % (np.sum(Y))
   print ' neg examples %d' % (np.sum(1-Y))

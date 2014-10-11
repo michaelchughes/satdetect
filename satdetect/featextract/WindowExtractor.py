@@ -6,6 +6,7 @@ import skimage
 import hashlib
 
 from satdetect.ioutil import loadImage, getFilepathParts, mkpath
+import matplotlib.pyplot as plt
 
 def transform(DataInfo, **kwargs):
   ''' Apply window extraction to all images in provided DataInfo dict.
@@ -14,7 +15,7 @@ def transform(DataInfo, **kwargs):
       ---------
       DataInfo : dict with fields
       * imgpathList : list of valid paths to files on disk
-      
+
       Keyword Args
       ---------
       --windowShape : tuple
@@ -36,13 +37,12 @@ def transform(DataInfo, **kwargs):
   print '<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< This is WindowExtractor.transform'
   tilepathList = list()
   for imgpath in DataInfo['imgpathList']:
-    curtpathList = extractWindowsFromImage(imgpath, DataInfo['outpath'],
-                                           **kwargs)
+    curtpathList = extractWindowsFromImage(imgpath, DataInfo['outpath'], **kwargs)
     tilepathList.extend(curtpathList)
   DataInfo['tilepathList'] = tilepathList
   return DataInfo
 
-def extractWindowsFromImage(imgpath, outpath, 
+def extractWindowsFromImage(imgpath, outpath,
                             window_shape=(25,25),
                             stride=4, S=500,
                             negDistThr=2, posDistThr=0.8):
@@ -63,12 +63,12 @@ def extractWindowsFromImage(imgpath, outpath,
 
   truebboxpath = imgpath.split('.')[0] + '_huts.pxbbox'
   if os.path.exists(truebboxpath):
-    PosBBox = loadStdBBox(truebboxpath, window_shape=window_shape) 
+    PosBBox = loadStdBBox(truebboxpath, window_shape=window_shape)
 
   nRow = int(np.ceil(GrayIm.shape[0] / float(S)))
   nCol = int(np.ceil(GrayIm.shape[1] / float(S)))
   tileID = 0
-  
+
   outfileList = list()
 
   print '================== %s' % (imgpath)
@@ -82,8 +82,8 @@ def extractWindowsFromImage(imgpath, outpath,
         continue
       if xh >= GrayIm.shape[1]:
         continue
-      tileID +=1 
-      
+      tileID +=1
+
       ## Define the four corners of this tile
       yl = np.maximum(0, r*S - (window_shape[0] - stride))
       xl = np.maximum(0, c*S - (window_shape[1] - stride))
@@ -93,7 +93,7 @@ def extractWindowsFromImage(imgpath, outpath,
       ## Expand the tile by just a little if that's enough to cover whole image
       ## and thus avoid a very small tile
       if yh + S / 4 > GrayIm.shape[0]:
-        yh = GrayIm.shape[0]        
+        yh = GrayIm.shape[0]
       if xh + S / 4 > GrayIm.shape[1]:
         xh = GrayIm.shape[1]
 
@@ -117,7 +117,7 @@ def extractWindowsFromImage(imgpath, outpath,
         ColorTile = None
       else:
         ColorTile = ColorIm[yl:yh, xl:xh, :].copy()
-      
+
       ## Extract the windows, with corresponding bounding boxes
       # WIm : 2D array, Nwindows x window_shape
       # WBox : 2D array, Nwindows x 4
@@ -138,7 +138,7 @@ def extractWindowsFromImage(imgpath, outpath,
         negMask = DistToNearestPos > negDistThr * stride
         posIDs = np.flatnonzero(posMask)
         negIDs = np.flatnonzero(negMask)
-        
+
 
         PosWIm = WIm[posIDs]
         Y = -1 * np.ones(WIm.shape[0], np.int32)
@@ -146,10 +146,10 @@ def extractWindowsFromImage(imgpath, outpath,
         Y[posIDs] = 1
 
         ## Determine the visible bounding boxes for current tile
-        xs_match = np.logical_and(PosBBox[:,2] >= xl, 
-                                  PosBBox[:,3] < xh) 
-        ys_match = np.logical_and(PosBBox[:,0] >= yl, 
-                                  PosBBox[:,1] < yh ) 
+        xs_match = np.logical_and(PosBBox[:,2] >= xl,
+                                  PosBBox[:,3] < xh)
+        ys_match = np.logical_and(PosBBox[:,0] >= yl,
+                                  PosBBox[:,1] < yh )
         visibleIDs = np.flatnonzero(np.logical_and(xs_match, ys_match))
         curPosBBox = PosBBox[visibleIDs].copy()
         curPosBBox[:, [0,1]] -= yl
@@ -165,7 +165,7 @@ def extractWindowsFromImage(imgpath, outpath,
                         WIm=WIm,
                         TileBBox=WBox, ImBBox=BBox,
                         Y=Y, PosWIm=PosWIm,
-                        curPosBBox=curPosBBox, imgpath=imgpath)      
+                        curPosBBox=curPosBBox, imgpath=imgpath)
     return outfileList
 
 def extractWindowsWithBBox(Im, window_shape, stride):
@@ -227,7 +227,7 @@ def loadStdBBox(bboxpath, **kwargs):
   return makeStdBBox(PBox, **kwargs)
 
 def makeStdBBox(PBox, window_shape=(25,25), Himage=None, Wimage=None):
-  ''' Convert pixel bounding boxes in given array to standard size 
+  ''' Convert pixel bounding boxes in given array to standard size
 
       Returns
       -------
