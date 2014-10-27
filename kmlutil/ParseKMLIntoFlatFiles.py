@@ -34,33 +34,51 @@ def ReadObjectsFromKMLIntoScenes(kmlfilepath, Scenes):
         * items : list of objects
   '''
   print '<<<<<<<<<<<<<<<<<<<<<<<<< This is ReadObjectsFromKML'
+  uid = 1
+  xmlstring = ''.join(open(kmlfilepath,'r').readlines())
+  dom = parseString(xmlstring)
+  markList = dom.getElementsByTagName('Placemark')
+  for mark in markList:
+    ## Get custom KML snippet just for this placemark
+    markXMLString = "<kml>\n" + mark.toxml() + "\n</kml>"
 
-  kmlobj = fastkml.kml.KML()
-  kmlobj.from_string('\n'.join(open(kmlfilepath,'r').readlines()))
-  masterdoc = [f for f in kmlobj.features()][0]
-  uid=1
-  for ff in masterdoc.features():
-    print 'FOLDER: ',ff.name
-        
-    for fff in ff.features():
-      if fff._geometry is not None:
-        type = GetObjectTypeFromName(fff.name)
-        lonMin, latMin, lonMax, latMax = fff.geometry.bounds
-        objDict = dict(uid=uid,
-                       latMax=latMax, latMin=latMin,
-                       lonMax=lonMax, lonMin=lonMin,
-                       type=type,               
-                      )
-        uid += 1
-        
-        ## Loop over existing scenes, and
-        ## Add this object to the one that contains its lat/long bounding box
-        for s in Scenes:
-          if lonMin >= s['lonMin'] and lonMax <= s['lonMax']:
-            if latMin >= s['latMin'] and latMax <= s['latMax']:
-              s['objects'].append(objDict)
-              print '   Object:', fff.name, ' ->', s['name']
+    ## Convert into custom "fastkml" object, which is geometry aware
+    markobj = fastkml.kml.KML()
+    try:
+      markobj.from_string(markXMLString)
+    except Exception as e:
+      print markXMLString
+      raise e
+    markFeat = [f for f in markobj.features()][0]
 
+    try:
+      type = GetObjectTypeFromName(markFeat.name)
+    except ValueError as e:
+      # Skip placemarks that don't annotate objects of interest
+      continue 
+
+    lonMin, latMin, lonMax, latMax = markFeat.geometry.bounds
+    objDict = dict(uid=uid,
+                   latMax=latMax, latMin=latMin,
+                   lonMax=lonMax, lonMin=lonMin,
+                   type=type,               
+                   )
+        
+    didMatch = False
+    ## Loop over existing scenes, and
+    ## Add this object to the one that contains its lat/long bounding box
+    for s in Scenes:
+      if lonMin >= s['lonMin'] and lonMax <= s['lonMax']:
+        if latMin >= s['latMin'] and latMax <= s['latMax']:
+          s['objects'].append(objDict)
+          print '   Object:', markFeat.name, ' ->', s['name']
+          didMatch = True
+          break
+    if not didMatch:
+      print 'NO SCENE FOUND FOR OBJECT', markFeat.name
+      continue
+    uid += 1
+    
   return Scenes
 
 def GetObjectTypeFromName(itemname):
@@ -90,7 +108,6 @@ def ReadScenesFromKML(kmlfilepath):
                latMax : float
   '''
   print '<<<<<<<<<<<<<<<<<<<<<<<<< This is ReadScenesFromKML'
-
   xmlstring = ''.join(open(kmlfilepath,'r').readlines())
   dom = parseString(xmlstring)
   sceneList = dom.getElementsByTagName('GroundOverlay')
@@ -279,3 +296,4 @@ if __name__ == '__main__':
   Scenes = ReadObjectsFromKMLIntoScenes(args.kmlfilepath, Scenes)
 
   WriteScenesAndObjectsToFlatFiles(Scenes, args.outpath)
+  
