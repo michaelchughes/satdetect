@@ -13,6 +13,7 @@
 # ======================================================  EXCLUDE FILE PATTERNS
 experiments/
 local/
+wiki/
 .texpadtmp/
 
 # Exclude user-specific config options for where to read and write data
