@@ -1,0 +1,3 @@
+[submodule "satdetect.wiki"]
+	path = satdetect.wiki
+	url = git://github.com/michaelchughes/satdetect.wiki

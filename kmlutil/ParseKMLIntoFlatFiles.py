@@ -1,13 +1,13 @@
 '''
-ParseKMLIntoXObjects.py
+ParseKMLIntoFlatFiles.py
 
 Command-line script for converting KML annotations into flat-file format
 
 Examples
 --------
-$$ python ParseKMLIntoXObjects.py \
-              /data/tukuls/Sudan/data/doc.kml \ # input kml spec
-              /data/tukuls/Sudan/data/     # output location
+$$ python ParseKMLIntoFlatFiles.py \
+          /path/to/doc.kml \ # input kml spec
+          /path/to/output/subdir/     # output location
 
 
 '''
@@ -20,82 +20,65 @@ from xml.dom.minidom import parseString
 from scipy.misc import imread
 
 import fastkml
-from shapely.geometry import LinearRing
 
-def ReadScenesWithXObjectsFromKML(kmlfilepath):
+
+########################################################### Read objects
+###########################################################
+def ReadObjectsFromKMLIntoScenes(kmlfilepath, Scenes):
   ''' Read all relevant info from KML file into a list of Scene dicts
 
       Returns
       --------
-      Scenes : list of dicts, where each dict has fields
-               * items : list of xobjects
+      Scenes 
+        list of dicts, where each dict has fields
+        * items : list of objects
   '''
-  Scenes = ReadSceneInfoFromKML(kmlfilepath)
+  print '<<<<<<<<<<<<<<<<<<<<<<<<< This is ReadObjectsFromKML'
 
   kmlobj = fastkml.kml.KML()
   kmlobj.from_string('\n'.join(open(kmlfilepath,'r').readlines()))
   masterdoc = [f for f in kmlobj.features()][0]
+  uid=1
   for ff in masterdoc.features():
     print 'FOLDER: ',ff.name
         
     for fff in ff.features():
-      fff.name = fix_itemname(fff.name)
-      print '  ',fff.name
       if fff._geometry is not None:
-       AddXObjectBBoxToScene(Scenes, fff.name, fff.geometry)
+        type = GetObjectTypeFromName(fff.name)
+        lonMin, latMin, lonMax, latMax = fff.geometry.bounds
+        objDict = dict(uid=uid,
+                       latMax=latMax, latMin=latMin,
+                       lonMax=lonMax, lonMin=lonMin,
+                       type=type,               
+                      )
+        uid += 1
+        
+        ## Loop over existing scenes, and
+        ## Add this object to the one that contains its lat/long bounding box
+        for s in Scenes:
+          if lonMin >= s['lonMin'] and lonMax <= s['lonMax']:
+            if latMin >= s['latMin'] and latMax <= s['latMax']:
+              s['objects'].append(objDict)
+              print '   Object:', fff.name, ' ->', s['name']
 
   return Scenes
 
-def WriteScenesWithXObjectsToFile(Scenes, outpath):
-  ''' Write the contents of the Scenes list to image/flattext files in outpath
+def GetObjectTypeFromName(itemname):
+  ''' Return standard lowercase string describing type of named object
 
-     Disk output
-     -----------
-     each scene in Scene results in:
-     * <sceneName>.jpg
-     * <sceneName>.llbbox
-     * <sceneName>_<objType>.pxbbox 
-
-     Returns
-     --------
-     None
+      Example
+      ---------
+      >> GetObjectTypeFromName('tukul50')
+      'huts'
   '''
-  for sID, Scene in enumerate(Scenes):
-    ## Write latitude/longitude bbox for entire image
-    with open(os.path.join(outpath, Scene['name'] + '.llbbox'),'w') as f:
-      f.write(prettyprint_latlong_bbox(Scene) + '\n')
+  if itemname.count('tukle') or itemname.count('tukul') \
+                             or itemname.count('hut'):
+    return 'huts'
+  raise ValueError('UNKNOWN TYPE:' + itemname)
 
-    ## Write latitude/longitude bbox for all huts
-    with open(os.path.join(outpath, Scene['name'] + '_huts.llbbox'),'w') as f:
-      for item in Scene['items']:
-        f.write(prettyprint_latlong_bbox(item) + '\n')
-
-    ## Make copy of image source file, for easy access
-    destpath = os.path.join(outpath, Scene['name'] + '.jpg')
-    try:
-      shutil.copyfile(Scene['imgfile'], destpath)
-    except Exception as e:
-      if str(e).count("same file"):
-        pass
-      else:
-        raise e
-
-    ## Read in the image (as grayscale) to obtain correct pixel sizes
-    img = imread(destpath, flatten=True) 
-    H, W = img.shape
-
-    ## Write the pixel bbox of each entire Scene image
-    with open(os.path.join(outpath, Scene['name'] + '.pxbbox'),'w') as f:
-      pxbbox = convert_latlong_to_pixel_bbox(H, W, Scene, Scene)
-      f.write(prettyprint_pixel_bbox(pxbbox) + '\n')
-
-    ## Write the pixel bbox of each hut
-    with open( os.path.join(outpath, Scene['name'] + '_huts.pxbbox'),'w') as f:
-      for item in Scene['items']:
-        pxbbox = convert_latlong_to_pixel_bbox(H, W, Scene, item)
-        f.write(prettyprint_pixel_bbox(pxbbox) + '\n')
-
-def ReadSceneInfoFromKML(kmlfilepath):
+########################################################### Read scenes
+###########################################################
+def ReadScenesFromKML(kmlfilepath):
   ''' Read KMLFile and return list of Scene info (imgfile, latlong bbox)
 
       Returns
@@ -106,6 +89,8 @@ def ReadSceneInfoFromKML(kmlfilepath):
                latMin : float
                latMax : float
   '''
+  print '<<<<<<<<<<<<<<<<<<<<<<<<< This is ReadScenesFromKML'
+
   xmlstring = ''.join(open(kmlfilepath,'r').readlines())
   dom = parseString(xmlstring)
   sceneList = dom.getElementsByTagName('GroundOverlay')
@@ -122,28 +107,13 @@ def ReadSceneInfoFromKML(kmlfilepath):
     curdict = dict(imgfile=fullpath, name=GetSceneName(imgfile),
                                     latMax=latMax, latMin=latMin,
                                     lonMax=lonMax, lonMin=lonMin,
-                                    items=list())
+                                    objects=list())
+
+    print ' Scene: ', curdict['name']
+    print '    ', imgfile
     Scenes.append(curdict)
   return Scenes
 
-def AddXObjectBBoxToScene(Scenes, itemname, geom):
-  ''' Append a dict of lat/long info for an object into a scene
-
-      Returns
-      --------
-      None. Updates to Scenes list happen in-place. 
-  '''
-  lonMin, latMin, lonMax, latMax = geom.bounds
-  itemdict = dict(name=itemname, latMax=latMax, latMin=latMin,
-                                 lonMax=lonMax, lonMin=lonMin,
-                  type=GetObjectTypeFromName(itemname),               
-                  )
-  ## Loop over existing scenes, and
-  ## add the object to the one that contains its lat/long bounding box
-  for s in Scenes:
-    if lonMin >= s['lonMin'] and lonMax <= s['lonMax']:
-      if latMin >= s['latMin'] and latMax <= s['latMax']:
-        s['items'].append(itemdict)
 
 def GetSceneName(imgfilename):
   ''' Return filebasename (without extension), which is the unique ID for scene
@@ -156,33 +126,73 @@ def GetSceneName(imgfilename):
   basename = imgfilename.split(os.path.sep)[-1]
   return basename.split('.')[0]
 
-def GetObjectTypeFromName(itemname):
-  ''' Return standard lowercase string describing type of named object
+########################################################### Write Flat Files
+###########################################################
+def WriteScenesAndObjectsToFlatFiles(Scenes, outpath):
+  ''' Write the contents of the Scenes list to flat plain-text files in outpath
 
-      Example
-      ---------
-      >> GetObjectTypeFromName('tukul50')
-      'hut'
+     Disk output
+     -----------
+     Each scene results in:
+     * <sceneName>.jpg
+     * <sceneName>.llbbox
+     * <sceneName>.pxbbox
+     * <sceneName>_<objType>.llbbox 
+     * <sceneName>_<objType>.pxbbox 
+
+     Returns
+     --------
+     None
   '''
-  if itemname.count('tukle') or itemname.count('tukul') \
-                             or itemname.count('hut'):
-    return 'hut'
-  print itemname
-  #raise ValueError('UNKNOWN TYPE:' + itemname)
-  return 'hut'
+  print '<<<<<<<<<<<<<<<<<<<<<<<<< This is WriteScenesAndObjectsToFlatFiles'
 
-def fix_itemname(itemname):
-  ''' Fix string name for scene or object to avoid whitespaces and capitals
+  for sID, Scene in enumerate(Scenes):
+    ## Make copy of image source file, for easy access
+    destpath = os.path.join(outpath, Scene['name'] + '.jpg')
+    try:
+      shutil.copyfile(Scene['imgfile'], destpath)
+    except Exception as e:
+      if str(e).count("same file"):
+        pass
+      else:
+        raise e
 
-      Example
-      ---------
-      >> fix_itemname('Tukle 33')
-      'tukle33'
-  '''
-  itemname = itemname.split('_')[0]
-  itemname = itemname.replace(' ', '')
-  return itemname.lower()
+    ## Read in image as grayscale to obtain correct pixel sizes
+    img = imread(destpath, flatten=True) 
+    H, W = img.shape
 
+    ## Write latitude/longitude bbox for entire image
+    sllbboxfpath = os.path.join(outpath, Scene['name'] + '.llbbox')
+    with open(sllbboxfpath,'w') as f:
+      f.write(prettyprint_latlong_bbox(Scene) + '\n')
+
+    ## Write the pixel bbox of each entire Scene image
+    spxbboxfpath = os.path.join(outpath, Scene['name'] + '.pxbbox')
+    with open(spxbboxfpath,'w') as f:
+      pxbbox = convert_latlong_to_pixel_bbox(H, W, Scene, Scene)
+      f.write(prettyprint_pixel_bbox(pxbbox) + '\n')
+
+    print '=============', Scene['name']
+    resStr = calcResolutionForScene(sllbboxfpath, spxbboxfpath)
+    print resStr
+    with open(os.path.join(outpath, Scene['name'] + '.resolution'),'w') as f:
+      f.write(resStr +'\n')
+
+    ## Write latitude/longitude bbox and pixel bbox for all hut objects
+    for objType in ['huts']:
+      objbasename = Scene['name'] + '_' + objType
+      objllbboxpath = os.path.join(outpath, objbasename + '.llbbox')
+      with open(objllbboxpath,'w') as f:
+        for obj in Scene['objects']:
+          if obj['type'] == objType:
+            f.write(prettyprint_latlong_bbox(obj) + '\n')
+
+      objpxbboxpath = os.path.join(outpath, objbasename + '.pxbbox')
+      with open(objpxbboxpath,'w') as f:
+        for obj in Scene['objects']:
+          if obj['type'] == objType:
+            pxbbox = convert_latlong_to_pixel_bbox(H, W, Scene, obj)
+            f.write(prettyprint_pixel_bbox(pxbbox) + '\n')
 
 def convert_latlong_to_pixel_bbox(H, W, Scene, item):
   ''' Convert latitude/longitude bbox to a pixel bbox, using Scene bounds
@@ -218,19 +228,20 @@ def prettyprint_pixel_bbox(SDict):
   return '%.0f %.0f %.0f %.0f' % (SDict['yMin'], SDict['yMax'],
                                   SDict['xMin'], SDict['xMax'])
 
-def calcResolutionFromFiles(llfile, pxfile):
+########################################################### Calculations
+###########################################################
+
+def calcResolutionForScene(llfile, pxfile, units='all'):
   LBox = np.loadtxt(llfile)
   PBox = np.loadtxt(pxfile)
   Hpx = PBox[1]
   Wpx = PBox[3]
   Hm = calcDistBetweenLatLongPair(LBox[0], LBox[2], LBox[1], LBox[2])
   Wm = calcDistBetweenLatLongPair(LBox[0], LBox[2], LBox[0], LBox[3])
-  print "H x W (pixels): %6.1f x %6.1f" % (Hpx, Wpx)
-  print "H x W (meters): %6.1f x %6.1f" % (Hm, Wm)
-  print "H x W (m/px):   %6.2f x %6.2f" % (Hm/Hpx, Wm/Wpx)
-
-def determineMetersPerPixelResolution(SDict, H, W):
-  pass
+  res_px ="%7d x %7d (pixels)" % (Hpx, Wpx)
+  res_m = "%7.1f x %7.1f (meters)" % (Hm, Wm)
+  res_mpx = "%7.2f x %7.2f (m/px)" % (Hm/Hpx, Wm/Wpx)
+  return '\n'.join([res_px, res_m, res_mpx])
 
 def calcDistBetweenLatLongPair(latA, lonA, latB, lonB):
   ''' Calculate dist between two pairs of lat/long coordinates
@@ -241,7 +252,6 @@ def calcDistBetweenLatLongPair(latA, lonA, latB, lonB):
   '''
   ## Source: http://nssdc.gsfc.nasa.gov/planetary/factsheet/earthfact.html
   R_earth = 6378.1 * 1000 
-  #R_earth = 6371
 
   phiA = degToRad(latA)
   phiB = degToRad(latB)
@@ -256,6 +266,8 @@ def calcDistBetweenLatLongPair(latA, lonA, latB, lonB):
 def degToRad(deg):
   return np.pi / 180 * deg
 
+########################################################### Run As Script
+###########################################################
 if __name__ == '__main__':
   parser = argparse.ArgumentParser()
   parser.add_argument('kmlfilepath')
@@ -263,5 +275,7 @@ if __name__ == '__main__':
   args = parser.parse_args()
 
 
-  Scenes = ReadScenesWithXObjectsFromKML(args.kmlfilepath)
-  WriteScenesWithXObjectsToFile(Scenes, args.outpath)
+  Scenes = ReadScenesFromKML(args.kmlfilepath)
+  Scenes = ReadObjectsFromKMLIntoScenes(args.kmlfilepath, Scenes)
+
+  WriteScenesAndObjectsToFlatFiles(Scenes, args.outpath)
