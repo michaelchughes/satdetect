@@ -40,7 +40,13 @@ def ReadObjectsFromKMLIntoScenes(kmlfilepath, Scenes):
   markList = dom.getElementsByTagName('Placemark')
   for mark in markList:
     ## Get custom KML snippet just for this placemark
-    markXMLString = "<kml>\n" + mark.toxml() + "\n</kml>"
+    rawXMLString = "<kml>\n" + mark.toxml() + "\n</kml>"
+
+    ## Remove non-native KML tags that start with "gx"
+    markXMLString = ''
+    for line in rawXMLString.split('\n'):
+      if line.count('gx:') == 0:
+        markXMLString += line + '\n'
 
     ## Convert into custom "fastkml" object, which is geometry aware
     markobj = fastkml.kml.KML()
@@ -70,16 +76,19 @@ def ReadObjectsFromKMLIntoScenes(kmlfilepath, Scenes):
     for s in Scenes:
       if lonMin >= s['lonMin'] and lonMax <= s['lonMax']:
         if latMin >= s['latMin'] and latMax <= s['latMax']:
-          s['objects'].append(objDict)
+          s[type + '_objects'].append(objDict)
           print '   Object:', markFeat.name, ' ->', s['name']
           didMatch = True
           break
     if not didMatch:
-      print 'NO SCENE FOUND FOR OBJECT', markFeat.name
+      print 'NO SCENE CONTAINS BBOX FOR OBJECT', markFeat.name
       continue
     uid += 1
     
   return Scenes
+
+def getAllObjectTypes():
+  return ['huts', 'possibles']
 
 def GetObjectTypeFromName(itemname):
   ''' Return standard lowercase string describing type of named object
@@ -89,7 +98,10 @@ def GetObjectTypeFromName(itemname):
       >> GetObjectTypeFromName('tukul50')
       'huts'
   '''
-  if itemname.count('tukle') or itemname.count('tukul') \
+  itemname = itemname.lower()
+  if itemname.count('possible'):
+    return 'possibles'
+  elif itemname.count('tukle') or itemname.count('tukul') \
                              or itemname.count('hut'):
     return 'huts'
   raise ValueError('UNKNOWN TYPE:' + itemname)
@@ -121,10 +133,20 @@ def ReadScenesFromKML(kmlfilepath):
     latMin = float(s.getElementsByTagName('south')[0].firstChild.nodeValue)
     lonMax = float(s.getElementsByTagName('east')[0].firstChild.nodeValue)
     lonMin = float(s.getElementsByTagName('west')[0].firstChild.nodeValue)
+
+    rotElements = s.getElementsByTagName('rotation')
+    if len(rotElements) > 0:
+      rot = float(rotElements[0].firstChild.nodeValue)
+    else:
+      rot = 0.0
+
     curdict = dict(imgfile=fullpath, name=GetSceneName(imgfile),
+                                    rotation=rot,
                                     latMax=latMax, latMin=latMin,
                                     lonMax=lonMax, lonMin=lonMin,
-                                    objects=list())
+                                    )
+    for objType in getAllObjectTypes():
+      curdict[objType + '_objects'] = list()
 
     print ' Scene: ', curdict['name']
     print '    ', imgfile
@@ -178,6 +200,10 @@ def WriteScenesAndObjectsToFlatFiles(Scenes, outpath):
     img = imread(destpath, flatten=True) 
     H, W = img.shape
 
+    rotfpath = os.path.join(outpath, Scene['name'] + '.rotation')
+    with open(rotfpath, 'w') as f:
+      f.write('%.5f' % (Scene['rotation']) + '\n')
+
     ## Write latitude/longitude bbox for entire image
     sllbboxfpath = os.path.join(outpath, Scene['name'] + '.llbbox')
     with open(sllbboxfpath,'w') as f:
@@ -196,17 +222,17 @@ def WriteScenesAndObjectsToFlatFiles(Scenes, outpath):
       f.write(resStr +'\n')
 
     ## Write latitude/longitude bbox and pixel bbox for all hut objects
-    for objType in ['huts']:
+    for objType in getAllObjectTypes():
       objbasename = Scene['name'] + '_' + objType
       objllbboxpath = os.path.join(outpath, objbasename + '.llbbox')
       with open(objllbboxpath,'w') as f:
-        for obj in Scene['objects']:
+        for obj in Scene[objType + '_objects']:
           if obj['type'] == objType:
             f.write(prettyprint_latlong_bbox(obj) + '\n')
 
       objpxbboxpath = os.path.join(outpath, objbasename + '.pxbbox')
       with open(objpxbboxpath,'w') as f:
-        for obj in Scene['objects']:
+        for obj in Scene[objType + '_objects']:
           if obj['type'] == objType:
             pxbbox = convert_latlong_to_pixel_bbox(H, W, Scene, obj)
             f.write(prettyprint_pixel_bbox(pxbbox) + '\n')
