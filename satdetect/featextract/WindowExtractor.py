@@ -5,8 +5,10 @@ from scipy.spatial.distance import cdist
 import skimage
 import hashlib
 
-from satdetect.ioutil import loadImage, getFilepathParts, mkpath
+from satdetect.ioutil import loadImage, getFilepathParts, mkpath, loadLabelConfig
 import matplotlib.pyplot as plt
+import pdb
+import cPickle
 
 def transform(DataInfo, **kwargs):
   ''' Apply window extraction to all images in provided DataInfo dict.
@@ -33,14 +35,102 @@ def transform(DataInfo, **kwargs):
   ustring = ''.join(DataInfo['imgpathList'])
   uid = int(hashlib.md5(ustring).hexdigest(), 16) % 10000
   DataInfo['trainuname'] = '%04d' % (uid)
+  configpath="/home/hasnain/documents/projects/tukuldata/datasets/labels.cfg"
 
   print '<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< This is WindowExtractor.transform'
   tilepathList = list()
   for imgpath in DataInfo['imgpathList']:
     curtpathList = extractWindowsFromImage(imgpath, DataInfo['outpath'], **kwargs)
+    #curtpathList = extractLabelsFromImage(imgpath, configpath, DataInfo['outpath']);
     tilepathList.extend(curtpathList)
   DataInfo['tilepathList'] = tilepathList
   return DataInfo
+
+def extractLabelsFromImage(imgpath, configpath, outpath, window_shape=(25,25), stride=4, S=500, negDistThr=2, posDistThr=0.8):
+
+  '''
+    First extract all labels from the image.
+    Then divide image into tiles and extract windows from unlaballed patches
+    i/p:
+        imgpath: Path to input file
+        outpath: Path to output files
+        window_shape: Shape of extracted patch
+        stride: Distance between two successive patches
+        S: Size of a tile
+
+    o/p:
+        outfileList: list of filepaths to .npz files where each tile is stored1
+         ____x
+        |
+        |
+    y
+'''
+  labelstride = 3
+  lextra = 10
+  outfilelist = list()
+  basename = "tmp_hasnain"
+  outfile = os.path.join(outpath, basename)
+  outfilelist.append(outfile)
+
+  GrayIm = loadImage(imgpath, color='gray')
+  try:
+    ColorIm = loadImage(imgpath, color='rgb')
+  except:
+    ColorIm = None
+
+  labels = loadLabelConfig(configpath)
+  labelpaths = []
+  PosBBox = {}
+  for label in labels:
+    truebboxpath = imgpath.split('.')[0] + '_' + label + '.pxbbox'
+    if os.path.exists(truebboxpath):
+      PosBBox[label] = loadStdBBox(truebboxpath, window_shape=window_shape)
+  height, width = GrayIm.shape
+  #Extract label patches
+  #Start from -20 in each dimension of bounding box and go till +20
+  outfileList = list()
+
+  for label in labels:
+    labelTiles = np.empty((1, window_shape[0], window_shape[1]))
+    colorLabelTiles = np.empty((1, window_shape[0], window_shape[1], 3))
+    basename = os.path.basename(imgpath).split('.')[0]
+    outfile = outpath + basename + "_" + label + ".dump"
+    if label in PosBBox.keys():
+      bboxs = PosBBox[label]
+      for i in range(0, len(bboxs)):
+        bbox = bboxs[i]
+        (yl, yh) = (min(max(0, bbox[0]-lextra),height-1), min(max(0, bbox[1]+lextra),height-1))
+        (xl, xh) = (min(max(0, bbox[2]-lextra),width-1), min(max(0, bbox[3]+lextra),width-1))
+        GrayTile = GrayIm[xl:xh, yl:yh].copy()
+        if (GrayTile.shape[0] < window_shape[0] or GrayTile.shape[1] < window_shape[1]):
+            continue
+        WIm, WBox = extractWindowsWithBBox(GrayTile, window_shape, labelstride)
+        labelTiles = np.append(labelTiles, WIm, 0)
+
+        if ColorIm is None:
+          ColorTile = None
+        else:
+          ColorTile = ColorIm[xl:xh, yl:yh, :].copy()
+        #pdb.set_trace()
+        
+        #Extract non label patches
+        #np.savez(outfile, GrayIm=GrayTile, ColorIm=ColorTile,
+        #         WIm=WIm, TileBBox=WBox, imgpath=imgpath)
+        #pdb.set_trace()
+        WIm, WBox = extractColorWindowsWithBBox(ColorTile, (window_shape[0], window_shape[1], 3), labelstride)
+        colorLabelTiles = np.append(colorLabelTiles, WIm, 0)
+      labelTiles = labelTiles[1::, :, :]
+      colorLabelTiles = colorLabelTiles[1::, :, :, :]
+      
+      dic = {}
+      dic['label'] = labelTiles
+      dic['color'] = colorLabelTiles
+      f = open(outfile, "wb")
+      cPickle.dump(dic, f, protocol=2)
+      f.close()
+      outfileList.append(outfile)
+
+  return outfileList
 
 def extractWindowsFromImage(imgpath, outpath,
                             window_shape=(25,25),
@@ -72,7 +162,8 @@ def extractWindowsFromImage(imgpath, outpath,
   outfileList = list()
 
   print '================== %s' % (imgpath)
-
+  labelTiles = np.empty((1, window_shape[0], window_shape[1]))
+  colorLabelTiles = np.empty((1, window_shape[0], window_shape[1], 3))
   ## March through all tiles, extracting windows and saving to file
   yh = 0
   xh = 0
@@ -117,14 +208,18 @@ def extractWindowsFromImage(imgpath, outpath,
         ColorTile = None
       else:
         ColorTile = ColorIm[yl:yh, xl:xh, :].copy()
-
+        WIm, WBox = extractColorWindowsWithBBox(ColorTile, (window_shape[0],window_shape[1],3), stride)
+        colorLabelTiles = np.append(colorLabelTiles, WIm, 0)
       ## Extract the windows, with corresponding bounding boxes
       # WIm : 2D array, Nwindows x window_shape
       # WBox : 2D array, Nwindows x 4
       # WBox provides bbox in tile-specific coordinates [min=0, max=S]
       # BBox : 2D array, Nwindows x 4
       # BBox provides bbox in whole-image coordinates [min=0, max=GrayIm.shape]
+      
       WIm, WBox = extractWindowsWithBBox(GrayTile, window_shape, stride)
+      labelTiles = np.append(labelTiles, WIm, 0)
+      
       BBox = WBox.copy()
       BBox[:, [0,1]] += yl
       BBox[:, [2,3]] += xl
@@ -161,11 +256,25 @@ def extractWindowsFromImage(imgpath, outpath,
         PosWIm = None
         Y = None
         curPosBBox = None
-      np.savez(outfile, GrayIm=GrayTile, ColorIm=ColorTile,
-                        WIm=WIm,
-                        TileBBox=WBox, ImBBox=BBox,
-                        Y=Y, PosWIm=PosWIm,
-                        curPosBBox=curPosBBox, imgpath=imgpath)
+      #np.savez(outfile, GrayIm=GrayTile, ColorIm=ColorTile,
+      #                  WIm=WIm,
+      #                  TileBBox=WBox, ImBBox=BBox,
+      #                  Y=Y, PosWIm=PosWIm,
+      #                  curPosBBox=curPosBBox, imgpath=imgpath)
+      #pdb.set_trace()
+    basename = os.path.basename(imgpath).split('.')[0]
+    pdb.set_trace()
+
+    labelTiles = np.array(labelTiles[1::, :, :], dtype=np.float32)
+    colorLabelTiles = np.array(colorLabelTiles[1::, :, :, :], dtype=np.float32)
+    
+    dic = {}
+    dic['label'] = labelTiles
+    dic['color'] = colorLabelTiles
+    f = open(outfile, "wb")
+    cPickle.dump(dic, f, protocol=2)
+    f.close()
+
     return outfileList
 
 def extractWindowsWithBBox(Im, window_shape, stride):
@@ -191,6 +300,32 @@ def extractWindowsWithBBox(Im, window_shape, stride):
   BBox[:,2] = Bx.flatten()
   BBox[:,3] = Bx.flatten() + window_shape[1]
   return WindowImSet, BBox
+
+def extractColorWindowsWithBBox(Im, window_shape, stride):
+  ''' Take manageable-sized image and extract all windows given shape and stride
+
+     Returns
+     -------
+     WindowImSet : 3D array, size nWindow x (window_shape)
+     BBox : 2D array, size nWindow x 4
+  '''
+  WindowImSet = skimage.util.view_as_windows(Im, window_shape, stride)
+  nR, nC, nc, H, W, c = WindowImSet.shape
+  nWindow = nR * nC
+  WindowImSet = np.reshape(WindowImSet, (nWindow, H, W, c))
+
+  H, W, c = Im.shape
+  ys = np.arange(0, H - window_shape[0] +1, stride)
+  xs = np.arange(0, W - window_shape[1] +1, stride)
+  Bx, By = np.meshgrid(xs, ys)
+  BBox = np.zeros( (Bx.size, 4))
+  BBox[:,0] = By.flatten()
+  BBox[:,1] = By.flatten() + window_shape[0]
+  BBox[:,2] = Bx.flatten()
+  BBox[:,3] = Bx.flatten() + window_shape[1]
+  return WindowImSet, BBox
+
+
 
 def calcDistMatrixForBBox(ABox, BBox):
   ''' Calculate distances between bounding boxes

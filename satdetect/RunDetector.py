@@ -29,7 +29,7 @@ def runDetector(imgpath='', cpath='', decisionThr=0.5,
   DInfo['outpath'] = TrainInfo['outpath']
 
   ## Break up satellite image into 25x25 pixel windows
-  WindowExtractor.transform(DInfo) 
+  WindowExtractor.transform(DInfo)
 
   ## Extract HOG feature vector for each window
   featExtractor = HOGFeatExtractor()
@@ -37,15 +37,3 @@ def runDetector(imgpath='', cpath='', decisionThr=0.5,
 
   ## Evaluate the classifier on the training set
   Detector.runDetector(C, DInfo, decisionThr=decisionThr, **kwargs)
-
-
-if __name__ == "__main__":
-  parser = argparse.ArgumentParser()
-  parser.add_argument('imgpath', type=str,
-                      help='path(s) to load training images from')
-  parser.add_argument('cpath', type=str,
-                      help='path where pre-trained classifier dump-file lives')
-  parser.add_argument('--decisionThr', type=float, default=0.5,
-                      help='decision threshold for classifier')
-  args = parser.parse_args()
-  runDetector(**args.__dict__)

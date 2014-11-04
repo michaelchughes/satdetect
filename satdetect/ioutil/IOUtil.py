@@ -21,7 +21,7 @@ def imgpath2list(imgpath):
       --------
       imgpathList : list of valid paths on this system
   '''
-  ## Remove backslashes from imgpath, 
+  ## Remove backslashes from imgpath,
   ## since these are sometimes added by terminal
   if type(imgpath) == str:
     imgpath = imgpath.replace('\\', '')
@@ -50,7 +50,7 @@ def getFilepathParts(path):
   return pathdir, basename, ext
 
 def loadImage(path, basename='', color='rgb'):
-  ''' Load JPEG image from file, 
+  ''' Load JPEG image from file,
 
       Returns
       --------
@@ -81,3 +81,19 @@ def loadImage(path, basename='', color='rgb'):
   if MaxVal > 1:
     IM /= MaxVal
   return IM
+
+def loadLabelConfig(configpath):
+  '''
+    Load config file
+    Returns a dictionary of label names and their properties
+  '''
+  print "Loading config file from path: " + configpath
+  f = open(configpath, 'r').readlines()
+
+  dic = {}
+  for line in f:
+    words = line.split()
+    assert(len(words) == 2 and "Invalid config file!")
+    dic[words[0]] = words[1]
+
+  return dic
