@@ -63,7 +63,7 @@ def extractLabelsFromImage(imgpath, configpath, outpath, window_shape=(25,25), s
          ____x
         |
         |
-    y
+       y
 '''
   labelstride = 3
   lextra = 10
