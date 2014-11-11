@@ -2,6 +2,8 @@ from optparse import OptionParser
 import os
 import cPickle
 import numpy as np
+import pdb
+
 
 def labelType(name):
 	nameWithoutExtension = os.path.splitext(name)[0]
@@ -36,7 +38,6 @@ def loadDumps(inputpath, colordic={}, graydic={}, colordesc={}, graydesc={}):
 					colordic[ltype] = np.append(colordic[ltype], dumpdata, 0)
 
 			elif (len(dumpdata.shape) == 3):
-				print "grayscale"
 				if (ltype not in graydic.keys()):
 					graydesc[dumpfile] = (dfile, ltype, 0, dumpdata.shape[0])	
 					graydic[ltype] = dumpdata
@@ -52,6 +53,12 @@ def loadDumps(inputpath, colordic={}, graydic={}, colordesc={}, graydesc={}):
 
 	return colordic, colordesc, graydic, graydesc
 
+
+def loadDumpsFromDirectories(inputpath):
+	if not os.path.isdir(inputpath):
+		raise Exception("inputpath: " + inputpath + " is not a dir")
+	colordic, colordesc, graydic, graydesc = loadDumps(inputpath)
+
 if __name__ == '__main__':
 	parser = OptionParser()
 	parser.add_option('-i', '--inputpath',  type=str, dest="inputpath", help='path to load dumped data from')
@@ -59,5 +66,5 @@ if __name__ == '__main__':
 	inputpath = options.inputpath
 	
 	colordic, colordesc, graydic, graydesc = loadDumps(inputpath)
-
-	print str(colordic['huts'].shape) + str(graydic['huts'].shape)
+	pdb.set_trace()
+	a = 1

@@ -40,8 +40,8 @@ def transform(DataInfo, **kwargs):
   print '<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< This is WindowExtractor.transform'
   tilepathList = list()
   for imgpath in DataInfo['imgpathList']:
-    curtpathList = extractWindowsFromImage(imgpath, DataInfo['outpath'], **kwargs)
-    #curtpathList = extractLabelsFromImage(imgpath, configpath, DataInfo['outpath']);
+    #curtpathList = extractWindowsFromImage(imgpath, DataInfo['outpath'], **kwargs)
+    curtpathList = extractLabelsFromImage(imgpath, configpath, DataInfo['outpath']);
     tilepathList.extend(curtpathList)
   DataInfo['tilepathList'] = tilepathList
   return DataInfo
@@ -101,17 +101,18 @@ def extractLabelsFromImage(imgpath, configpath, outpath, window_shape=(25,25), s
         bbox = bboxs[i]
         (yl, yh) = (min(max(0, bbox[0]-lextra),height-1), min(max(0, bbox[1]+lextra),height-1))
         (xl, xh) = (min(max(0, bbox[2]-lextra),width-1), min(max(0, bbox[3]+lextra),width-1))
-        GrayTile = GrayIm[xl:xh, yl:yh].copy()
+        GrayTile = GrayIm[yl:yh, xl:xh].copy()
         if (GrayTile.shape[0] < window_shape[0] or GrayTile.shape[1] < window_shape[1]):
             continue
+        
+        
         WIm, WBox = extractWindowsWithBBox(GrayTile, window_shape, labelstride)
         labelTiles = np.append(labelTiles, WIm, 0)
 
         if ColorIm is None:
           ColorTile = None
         else:
-          ColorTile = ColorIm[xl:xh, yl:yh, :].copy()
-        #pdb.set_trace()
+          ColorTile = ColorIm[yl:yh, xl:xh, :].copy()
         
         #Extract non label patches
         #np.savez(outfile, GrayIm=GrayTile, ColorIm=ColorTile,
@@ -119,12 +120,15 @@ def extractLabelsFromImage(imgpath, configpath, outpath, window_shape=(25,25), s
         #pdb.set_trace()
         WIm, WBox = extractColorWindowsWithBBox(ColorTile, (window_shape[0], window_shape[1], 3), labelstride)
         colorLabelTiles = np.append(colorLabelTiles, WIm, 0)
-      labelTiles = labelTiles[1::, :, :]
-      colorLabelTiles = colorLabelTiles[1::, :, :, :]
+
+      labelTiles = np.array(labelTiles[1::, :, :], dtype=np.float16)
+      colorLabelTiles = np.array(colorLabelTiles[1::, :, :, :], dtype=np.float16)
       
-      dic = {}
-      dic['label'] = labelTiles
-      dic['color'] = colorLabelTiles
+      #dic = {}
+      #dic['label'] = labelTiles
+      #dic['color'] = colorLabelTiles
+      dic = colorLabelTiles 
+      #pdb.set_trace()      
       f = open(outfile, "wb")
       cPickle.dump(dic, f, protocol=2)
       f.close()
@@ -263,14 +267,16 @@ def extractWindowsFromImage(imgpath, outpath,
       #                  curPosBBox=curPosBBox, imgpath=imgpath)
       #pdb.set_trace()
     basename = os.path.basename(imgpath).split('.')[0]
-    pdb.set_trace()
 
-    labelTiles = np.array(labelTiles[1::, :, :], dtype=np.float32)
-    colorLabelTiles = np.array(colorLabelTiles[1::, :, :, :], dtype=np.float32)
+    labelTiles = np.array(labelTiles[1::, :, :], dtype=np.float16)
+    colorLabelTiles = np.array(colorLabelTiles[1::, :, :, :], dtype=np.float16)
+    outfile = outpath + basename + "_" + "unlaballed" + ".dump"
     
-    dic = {}
-    dic['label'] = labelTiles
-    dic['color'] = colorLabelTiles
+    #dic = {}
+    #dic['label'] = labelTiles
+    #dic['color'] = colorLabelTiles
+    #pdb.set_trace()
+    dic = colorLabelTiles
     f = open(outfile, "wb")
     cPickle.dump(dic, f, protocol=2)
     f.close()
