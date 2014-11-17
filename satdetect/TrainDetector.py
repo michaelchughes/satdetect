@@ -10,6 +10,7 @@ from satdetect.detect import BasicTrainSetBuilder, Classifier
 def trainDetector(imgpath='', outpath='',
                   feat='hog',
                   cname='logistic',
+                  posObjectType='huts',
                   **kwargs):
   ''' Train a detector on imagery in imgpath, save results to outpath
 
@@ -22,7 +23,7 @@ def trainDetector(imgpath='', outpath='',
   DInfo = dict()
   DInfo['imgpathList'] = imgpathList
   DInfo['outpath'] = outpath
-
+  DInfo['posObjectType'] = posObjectType
   ## Break up satellite image into 25x25 pixel windows
   WindowExtractor.transform(DInfo) 
 
@@ -46,6 +47,10 @@ if __name__ == "__main__":
                       help='path(s) to load training images from')
   parser.add_argument('outpath', type=str,
                       help='path where results are saved')
+  parser.add_argument('--posObjectType', type=str,
+                      default='huts',
+                      help='name of object category to identify',
+                      choices=['huts', 'razed'])
   parser.add_argument('--cname', type=str,
                       help='name of classifier',
                       choices=['logistic', 'svm-linear', 'svm-rgb'])

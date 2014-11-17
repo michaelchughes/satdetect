@@ -37,12 +37,14 @@ def transform(DataInfo, **kwargs):
   tilepathList = list()
   for imgpath in DataInfo['imgpathList']:
     curtpathList = extractWindowsFromImage(imgpath, DataInfo['outpath'],
-                                           **kwargs)
+                                posObjectType=DataInfo['posObjectType'],
+                                **kwargs)
     tilepathList.extend(curtpathList)
   DataInfo['tilepathList'] = tilepathList
   return DataInfo
 
 def extractWindowsFromImage(imgpath, outpath, 
+                            posObjectType='huts',
                             window_shape=(25,25),
                             stride=4, S=500,
                             negDistThr=2, posDistThr=0.8):
@@ -55,23 +57,32 @@ def extractWindowsFromImage(imgpath, outpath,
       ---------
       outfileList : list of filepaths to .npz files where each tile is stored.
   '''
+  print '================== %s' % (imgpath)
+
   GrayIm = loadImage(imgpath, color='gray')
   try:
     ColorIm = loadImage(imgpath, color='rgb')
   except:
     ColorIm = None
 
-  truebboxpath = imgpath.split('.')[0] + '_huts.pxbbox'
+  PosBBox = None
+  truebboxpath = imgpath.split('.')[0] + '_' + posObjectType + '.pxbbox'
   if os.path.exists(truebboxpath):
-    PosBBox = loadStdBBox(truebboxpath, window_shape=window_shape) 
+    try:
+      PosBBox = loadStdBBox(truebboxpath, window_shape=window_shape) 
+    except ValueError as e:
+      if str(e).lower().count('empty') > 0:
+        # Skip empty PBoxes
+        print 'Warning: no annotations for image: \n%s\n' % (imgpath)
+        pass 
+      else:
+        raise e
 
   nRow = int(np.ceil(GrayIm.shape[0] / float(S)))
   nCol = int(np.ceil(GrayIm.shape[1] / float(S)))
   tileID = 0
   
   outfileList = list()
-
-  print '================== %s' % (imgpath)
 
   ## March through all tiles, extracting windows and saving to file
   yh = 0
@@ -129,7 +140,7 @@ def extractWindowsFromImage(imgpath, outpath,
       BBox[:, [0,1]] += yl
       BBox[:, [2,3]] += xl
 
-      if os.path.exists(truebboxpath):
+      if PosBBox is not None:
         ## Identify positive windows (within a few strides of a PosBBox)
         DistMatrix = calcDistMatrixForBBox(BBox, PosBBox)
         DistToNearestPos = DistMatrix.min(axis=1)
@@ -237,19 +248,25 @@ def makeStdBBox(PBox, window_shape=(25,25), Himage=None, Wimage=None):
           (ymax-ymin) = window_shape[0]
           (xmax-xmin) = window_shape[1]
   '''
+  if PBox.size == 0:
+    raise ValueError('Empty PBox')
+
   if PBox.ndim == 1:
     assert PBox.size == 4
     PBox = PBox[np.newaxis,:]
 
   H, W = window_shape
   SBox = np.zeros_like(PBox)
+
+  nShrinkRows = 0
   for rowID in xrange(PBox.shape[0]):
     curH = PBox[rowID,1]  - PBox[rowID,0]
     curW = PBox[rowID,3]  - PBox[rowID,2]
     gapH = (H - curH + 1) // 2
     gapW = (W - curW + 1) // 2
-    assert gapH >= 0
-    assert gapW >= 0
+
+    if gapH < 0 or gapW < 0:
+      nShrinkRows += 1
 
     ymin = PBox[rowID,0] - gapH
     ymax = PBox[rowID,1] + gapH
@@ -273,4 +290,9 @@ def makeStdBBox(PBox, window_shape=(25,25), Himage=None, Wimage=None):
     if Wimage is not None and xmax > Wimage:
       xmax = Wimage; xmin = Wimage - H
     SBox[rowID,:] = [ymin, ymax, xmin, xmax]
+
+  if nShrinkRows > 0:
+    print 'Warning: %d true bounding boxes were larger than desired size.' \
+          % (nShrinkRows)
+    print 'These boxes were cropped. Some relevant data may have been lost.' 
   return SBox

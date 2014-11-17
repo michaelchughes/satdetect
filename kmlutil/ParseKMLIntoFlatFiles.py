@@ -77,7 +77,7 @@ def ReadObjectsFromKMLIntoScenes(kmlfilepath, Scenes):
       if lonMin >= s['lonMin'] and lonMax <= s['lonMax']:
         if latMin >= s['latMin'] and latMax <= s['latMax']:
           s[type + '_objects'].append(objDict)
-          print '   Object:', markFeat.name, ' ->', s['name']
+          print '   Object:', markFeat.name, ' ->', s['name'], type
           didMatch = True
           break
     if not didMatch:
@@ -88,7 +88,7 @@ def ReadObjectsFromKMLIntoScenes(kmlfilepath, Scenes):
   return Scenes
 
 def getAllObjectTypes():
-  return ['huts', 'possibles']
+  return ['huts', 'possibles', 'razed']
 
 def GetObjectTypeFromName(itemname):
   ''' Return standard lowercase string describing type of named object
@@ -99,6 +99,10 @@ def GetObjectTypeFromName(itemname):
       'huts'
   '''
   itemname = itemname.lower()
+  if itemname.count('outer') or itemname.count('razed'):
+    return 'razed'
+  elif itemname.count('inner'):
+    raise ValueError('UNKNOWN TYPE:' + itemname)
   if itemname.count('possible'):
     return 'possibles'
   elif itemname.count('tukle') or itemname.count('tukul') \
