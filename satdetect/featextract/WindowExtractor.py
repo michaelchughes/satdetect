@@ -5,7 +5,7 @@ from scipy.spatial.distance import cdist
 import skimage
 import hashlib
 
-from satdetect.ioutil import loadImage, getFilepathParts, mkpath, loadLabelConfig
+from satdetect.ioutil import loadImage, getFilepathParts, mkpath, loadLabelConfig, saveImage
 import matplotlib.pyplot as plt
 import pdb
 import cPickle
@@ -105,7 +105,6 @@ def extractLabelsFromImage(imgpath, configpath, outpath, window_shape=(25,25), s
         if (GrayTile.shape[0] < window_shape[0] or GrayTile.shape[1] < window_shape[1]):
             continue
         
-        
         WIm, WBox = extractWindowsWithBBox(GrayTile, window_shape, labelstride)
         labelTiles = np.append(labelTiles, WIm, 0)
 
@@ -135,6 +134,185 @@ def extractLabelsFromImage(imgpath, configpath, outpath, window_shape=(25,25), s
       outfileList.append(outfile)
 
   return outfileList
+
+def createLabelImage(imgpath, configpath, outpath, window_shape=(25,25)):
+
+  if not os.path.exists(imgpath):
+    raise Exception("Image path: " + imgpath + " :does not exist")
+  if not os.path.exists(configpath):
+    raise Exception("Config path: " + configpath + " :does not exist")
+  if not os.path.isdir(outpath):
+    raise Exception("Outpath path: " + outpath + " :is not a directotry")
+
+  GrayIm = loadImage(imgpath, color='gray')
+  
+  labels = loadLabelConfig(configpath)
+  labelpaths = []
+  PosBBox = {}
+  for label in labels:
+    truebboxpath = imgpath.split('.')[0] + '_' + label + '.pxbbox'
+    if os.path.exists(truebboxpath):
+      PosBBox[label] = loadStdBBox(truebboxpath, window_shape=window_shape)
+  height, width = GrayIm.shape
+  
+  outfileList = list()
+
+  labelimage = np.zeros((GrayIm.shape[0], GrayIm.shape[1]))
+
+  basename = os.path.basename(imgpath).split('.')[0]
+  outfile = outpath + basename + "_" + "labels.jpg"
+
+  for label in labels:
+    if label in PosBBox:
+      bboxs = PosBBox[label]
+      labelnum = int(labels[label])
+      for i in range(0, len(bboxs)):
+        bbox = bboxs[i]
+        (yl, yh, xl, xh) = (bbox[0], bbox[1], bbox[2], bbox[3])
+        labelimage[yl:yh, xl:xh] = labelnum
+  saveImage(labelimage, outfile)
+  return
+
+def reconstructPathces(img, indexes, preds, imgpath, configpath, outpath, stride=3):
+  
+  if not (len(indexes) == len(preds)):
+    raise Exception("len(indexes): " + len(indexes) + " len(preds): " + len(preds))
+
+  imgname = os.path.basename(imgpath)
+  #Load config file
+  labels = loadLabelConfig(configpath)
+
+  for keys in range(0, len(labels.keys())+1):                                        #labels + 1 background label
+    label = labels[keys]
+    labelimg = np.zeros((img.shape[0], img.shape[1]))
+    outfile  = outpath + "/" + imgname.split.('.')[0] + "_" + label + "_labels.jpg"
+    for k in range(0, len(indices)):
+      index = indices[k]
+      i, j = (index[0], index[1])
+      labelimg[i, j] = preds[k][label]
+      labelimg[i-stride/2 : i+stride/2, j-stride/2 : j+stride/2] = preds[k][label]
+    saveImage(labelimg, outfile)
+  return
+
+def extractPatches(imgpath, configpath, outpath, window_shape=(25,25)):
+
+  if not os.path.exists(imgpath):
+    raise Exception("Image path: " + imgpath + " :does not exist")
+  if not os.path.exists(configpath):
+    raise Exception("Config path: " + configpath + " :does not exist")
+  if not os.path.isdir(outpath):
+    raise Exception("Outpath path: " + outpath + " :is not a directotry")
+
+  GrayIm = loadImage(imgpath, color='gray')
+  try:
+    ColorIm = loadImage(imgpath, color='rgb')
+  except:
+    raise Exception("Image is not a color image")
+  Im = ColorIm
+  height, width = (Im.shape[0], Im.shape[1])
+
+  print 'Extracting labels from patches ...'
+
+  patches, indices, stride, window_shape = DenseGrid(Im)
+
+  winshape = window_shape[0]
+  #Load config file
+  labels = loadLabelConfig(configpath)
+  
+  #Load label image
+  imgname = os.path.basename(imgpath)
+  labelImgName = os.path.dirname(imgpath) + "/" + imgname.split('.')[0] + '_labels.jpg'
+  LabelIm = loadImage(labelImgName, color='gray')
+
+  dic = {}
+  print 'Grouping patches into labels'
+
+  for k in range(0, len(indices)):
+    index = indices[k]
+    i, j = (index[0], index[1])
+    imglabel = int(LabelIm[(i,j)])
+    if imglabel not in dic.keys():
+      dic[imglabel] = [ patches[(i,j)] ]
+    else:
+      #dic[imglabel] = np.dstack((dic[imglabel],  patches[i,j]))
+      dic[imglabel].append( patches[i,j] )
+  
+  dic['stride'] = stride
+  outfilename = outpath + '/' + imgname.split('.')[0] + '.dump'
+
+  print 'Saving the extracted patches ....'
+  f = open(outfilename, 'wb')
+  cPickle.dump(dic, f, protocol=2)
+  f.close()
+
+  print 'Returning from extractPatches()'
+
+  return
+
+  #add all labels to dic
+  '''
+  for label in labels.keys():
+    value = int(labels[label])
+    labelIndices = np.where(LabelIm==value)
+    if len(labelIndices[0] != 0):
+      if value not in dic.keys():
+        dic[value] = []
+      for idx in range(0, len(labelIndices[0])):
+        print idx,
+        i = labelIndices[0][idx]
+        j = labelIndices[1][idx]
+        if (i >= winshape and i < height-winshape and j >= winshape and j < width-winshape):
+          #remove this from indices and pathces
+          try:
+            listidx = indices.index((i,j))
+            print liststidx
+            dic[value].append(patches[listidx])
+            indices.remove(listidx)
+            patches.remove(listidx)
+          except:
+            continue
+  '''
+'''
+  for label in labels.keys():
+    value = int(labels[label])
+    labelIndices = np.where(LabelIm==value)
+    if len(labelIndices[0] != 0):
+      if value not in dic.keys():
+        dic[value] = []
+      for idx in range(0, len(labelIndices[0])):
+        print idx,
+        i = labelIndices[0][idx]
+        j = labelIndices[1][idx]
+        if (i >= winshape and i < height-winshape and j >= winshape and j < width-winshape):
+          #remove this from indices and pathces
+          try:
+            listidx = indices.index((i,j))
+            print liststidx
+            dic[value].append(patches[listidx])
+            indices.remove(listidx)
+            patches.remove(listidx)
+          except:
+            continue
+
+'''
+  #add the remaining background pixels
+
+
+def DenseGrid(im, stride=3, window_shape=(25,25)):
+  if not window_shape[0] == window_shape[1]:
+    raise Exception("Window height and width should be equal. The passed window shape is: " + window_shape)
+  
+  height, width = (im.shape[0], im.shape[1])
+  winshape = window_shape[0]
+  patches = {}
+  indices = []
+  for i in range(winshape, height-winshape, stride):
+    for j in range(winshape, width-winshape, stride):
+      patch = im[i:i+winshape, j:j+winshape]
+      #patches.append(patch)
+      patches[(i,j)] = patch
+      indices.append((i, j))
+  return patches, indices,  stride, window_shape
 
 def extractWindowsFromImage(imgpath, outpath,
                             window_shape=(25,25),
@@ -315,6 +493,7 @@ def extractColorWindowsWithBBox(Im, window_shape, stride):
      WindowImSet : 3D array, size nWindow x (window_shape)
      BBox : 2D array, size nWindow x 4
   '''
+  pdb.set_trace()
   WindowImSet = skimage.util.view_as_windows(Im, window_shape, stride)
   nR, nC, nc, H, W, c = WindowImSet.shape
   nWindow = nR * nC

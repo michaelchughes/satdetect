@@ -4,9 +4,11 @@ import os
 import numpy as np
 import glob
 import joblib
+import scipy
 import scipy.io
 from skimage.data import imread
 from distutils.dir_util import mkpath
+import pdb
 
 def imgpath2list(imgpath):
   ''' Transform provided path (or path pattern) into a list of valid paths
@@ -81,6 +83,20 @@ def loadImage(path, basename='', color='rgb'):
   if MaxVal > 1:
     IM /= MaxVal
   return IM
+
+def saveImage(im, path=''):
+  '''
+  Saves a JPEG image
+  '''
+  if os.path.exists(path):
+    print "Image already exists: " + path + " ... Give a different name. Ignoring this save"
+    return
+  try:
+    scipy.misc.imsave(path, im)
+    print "Image: " + path + " successfully saved"
+  except:
+    print "Could not save image"
+  return
 
 def loadLabelConfig(configpath):
   '''
