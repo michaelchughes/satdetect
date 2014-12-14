@@ -79,7 +79,7 @@ def loadImage(path, basename='', color='rgb'):
   assert IM.min() >= 0.0
   assert IM.max() <= MaxVal
 
-  IM = np.asarray(IM, dtype=np.float64)
+  IM = np.asarray(IM, dtype=np.float16)
   if MaxVal > 1:
     IM /= MaxVal
   return IM
