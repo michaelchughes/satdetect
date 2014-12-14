@@ -195,7 +195,7 @@ def reconstructPathces(img, indexes, preds, imgpath, configpath, outpath, stride
     saveImage(labelimg, outfile)
   return
 
-def reconstructPredictedLabels(preds, img_dimensions, configpath, outpath, window_shape=(25,25), stride=3):
+def reconstructPredictedLabels(preds, img_dimensions, configpath, outpath, outname, window_shape=(25,25), stride=3):
   '''
     Reconstructs a prediction image for each label
     Go over all the labels. For each label, create a new image.
@@ -211,6 +211,8 @@ def reconstructPredictedLabels(preds, img_dimensions, configpath, outpath, windo
 
   height, width = (img_dimensions.shape[0], img_dimensions.shape[1])
   winshape = window_shape[0]
+  labels = loadLabelConfig(configpath)
+
 
   for label in preds.shape[1]:
     #For each label, create a new image
@@ -221,12 +223,15 @@ def reconstructPredictedLabels(preds, img_dimensions, configpath, outpath, windo
         predimg[i, j] = preds[count, label]
         count += 1
     assert count == preds.shape[0]    #assert that all labels are remapped to the image.
-    #Save the image
-    scipy.misc.imsave(outpath, predimg)
+    
+    for key in labels.keys():
+      if labels[key] == label:
+        #Save the image
+        scipy.misc.imsave(outpath + "_" + outname + "_" + key + ".jpg", predimg)
 
   return
 
-def extractPatches(imgpath, configpath, outpath, window_shape=(25,25)):
+def extractPatches(imgpath, configpath, outpath, window_shape=(25,25), for_training=1):
   '''
     Extracts patches using a label image 
   '''
@@ -247,7 +252,9 @@ def extractPatches(imgpath, configpath, outpath, window_shape=(25,25)):
 
   print 'Extracting labels from patches ...'
 
-  patches, indices, stride, window_shape = DenseGrid(Im)
+  patches, BBox, stride, window_shape = DenseGrid(Im)
+  if not for_training:
+    return Im, BBox, patches, stride
 
   winshape = window_shape[0]
   #Load config file
@@ -259,18 +266,29 @@ def extractPatches(imgpath, configpath, outpath, window_shape=(25,25)):
   LabelIm = loadImage(labelImgName, color='gray')
 
   dic = {}
+  patch_labels = {}
   print 'Grouping patches into labels'
 
-  for k in range(0, len(indices)):
-    index = indices[k]
-    i, j = (index[0], index[1])
-    imglabel = int(LabelIm[(i,j)])
-    if imglabel not in dic.keys():
-      dic[imglabel] = [ patches[(i,j)] ]
-    else:
-      #dic[imglabel] = np.dstack((dic[imglabel],  patches[i,j]))
-      dic[imglabel].append( patches[i,j] )
+  #Go over all the labels and find which are in some bbox
+  for k in range(0, len(labels.keys())+1):
+    patch_labels[k] = []
 
+  for k in range(0, BBox.shape[0]):
+    patch_center = (int(BBox[k][0]+BBox[k][1])/2), int((BBox[k][2] + BBox[k][3])/2)
+    imglabel = int(LabelIm[patch_center])
+    if str(imglabel) not in labels.values():
+      imglabel = 0
+    patch_labels[imglabel].append( (int(BBox[k][0]), int(BBox[k][1]), int(BBox[k][2]), int(BBox[k][3])) )
+
+  for k in range(0, len(patch_labels.keys())):
+    dic[k] = np.zeros((len(patch_labels[k]), window_shape[0], window_shape[1], 3))
+
+  for k in range(0, len(patch_labels.keys())):
+    label_coords = patch_labels[k]
+    for i in range(0, len(label_coords)):
+      patch_coords = label_coords[i]
+      dic[k][i, :, :, :] = Im[patch_coords[0]: patch_coords[1], patch_coords[2]: patch_coords[3]]
+  
   dic['stride'] = stride
   dic['imgname'] = imgname
   dic['img_dimensions'] = (Im.shape[0], Im.shape[1])
@@ -283,74 +301,15 @@ def extractPatches(imgpath, configpath, outpath, window_shape=(25,25)):
   f.close()
 
   print 'Returning from extractPatches()'
-
   return
 
-  #add all labels to dic
-  '''
-  for label in labels.keys():
-    value = int(labels[label])
-    labelIndices = np.where(LabelIm==value)
-    if len(labelIndices[0] != 0):
-      if value not in dic.keys():
-        dic[value] = []
-      for idx in range(0, len(labelIndices[0])):
-        print idx,
-        i = labelIndices[0][idx]
-        j = labelIndices[1][idx]
-        if (i >= winshape and i < height-winshape and j >= winshape and j < width-winshape):
-          #remove this from indices and pathces
-          try:
-            listidx = indices.index((i,j))
-            print liststidx
-            dic[value].append(patches[listidx])
-            indices.remove(listidx)
-            patches.remove(listidx)
-          except:
-            continue
-  '''
-'''
-  for label in labels.keys():
-    value = int(labels[label])
-    labelIndices = np.where(LabelIm==value)
-    if len(labelIndices[0] != 0):
-      if value not in dic.keys():
-        dic[value] = []
-      for idx in range(0, len(labelIndices[0])):
-        print idx,
-        i = labelIndices[0][idx]
-        j = labelIndices[1][idx]
-        if (i >= winshape and i < height-winshape and j >= winshape and j < width-winshape):
-          #remove this from indices and pathces
-          try:
-            listidx = indices.index((i,j))
-            print liststidx
-            dic[value].append(patches[listidx])
-            indices.remove(listidx)
-            patches.remove(listidx)
-          except:
-            continue
-
-'''
-  #add the remaining background pixels
-
-
-def DenseGrid(im, stride=3, window_shape=(25,25)):
+def DenseGrid(im, stride=3, window_shape=(25,25,3)):
   if not window_shape[0] == window_shape[1]:
     raise Exception("Window height and width should be equal. The passed window shape is: " + window_shape)
 
-  height, width = (im.shape[0], im.shape[1])
-  winshape = window_shape[0]
-  patches = {}
-  indices = []
-  for i in range(winshape, height-winshape, stride):
-    for j in range(winshape, width-winshape, stride):
-      patch = im[i:i+winshape, j:j+winshape]
-      #patches.append(patch)
-      patches[(i,j)] = patch
-      indices.append((i, j))
-  return patches, indices,  stride, window_shape
-
+  patches, BBox = extractColorWindowsWithBBox(im, window_shape, stride)
+  return patches, BBox, stride, window_shape
+  
 def extractWindowsFromImage(imgpath, outpath,
                             window_shape=(25,25),
                             stride=4, S=500,
@@ -530,7 +489,7 @@ def extractColorWindowsWithBBox(Im, window_shape, stride):
      WindowImSet : 3D array, size nWindow x (window_shape)
      BBox : 2D array, size nWindow x 4
   '''
-  pdb.set_trace()
+  #pdb.set_trace()
   WindowImSet = skimage.util.view_as_windows(Im, window_shape, stride)
   nR, nC, nc, H, W, c = WindowImSet.shape
   nWindow = nR * nC
