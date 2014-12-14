@@ -289,6 +289,9 @@ def extractPatches(imgpath, configpath, outpath, window_shape=(25,25), for_train
       patch_coords = label_coords[i]
       dic[k][i, :, :, :] = Im[patch_coords[0]: patch_coords[1], patch_coords[2]: patch_coords[3]]
   
+  for k in range(0, len(dic.keys())):
+    dic[k] = np.array(dic[k], dtype=np.float16)
+
   dic['stride'] = stride
   dic['imgname'] = imgname
   dic['img_dimensions'] = (Im.shape[0], Im.shape[1])
