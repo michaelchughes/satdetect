@@ -89,8 +89,8 @@ def saveImage(im, path=''):
   Saves a JPEG image
   '''
   if os.path.exists(path):
-    print "Image already exists: " + path + " ... Give a different name. Ignoring this save"
-    return
+    print "Image already exists: " + path + " ... Over-writing the image"
+    
   try:
     scipy.misc.imsave(path, im)
     print "Image: " + path + " successfully saved"

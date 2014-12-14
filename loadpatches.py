@@ -5,13 +5,35 @@ import numpy as np
 import pdb
 
 
+def LoadDumps(inputpath):
+	if (not os.path.isdir(inputpath)):
+		raise Exception("Input is not a directory")
+
+	for dfile in os.listdir(inputpath):
+		if os.path.isfile(dfile) and dfile.endswith('.dump'):
+			fd = open(dumpfile)
+			dumpdata = cPickle.load(fd)
+			fd.close()
+			ltype = labelType
+			colordic[dfile] = dumpdata
+
+if __name__ == '__main__':
+	parser = OptionParser()
+	parser.add_option('-i', '--inputpath',  type=str, dest="inputpath", help='path to load dumped data from')
+	(options, args) = parser.parse_args()
+	inputpath = options.inputpath
+	
+	colordic, colordesc = loadDumps(inputpath)
+	pdb.set_trace()
+
+
+'''
 def labelType(name):
 	nameWithoutExtension = os.path.splitext(name)[0]
 	ltype = nameWithoutExtension.split('_')[-1]
 	if (not (ltype == 'tree' or ltype == 'soil' or ltype == 'huts')):
 		ltype = 'unlabelled'
 	return ltype
-
 
 def loadDumps(inputpath, colordic={}, graydic={}, colordesc={}, graydesc={}):
 	if (not os.path.isdir(inputpath)):
@@ -68,3 +90,4 @@ if __name__ == '__main__':
 	colordic, colordesc, graydic, graydesc = loadDumps(inputpath)
 	pdb.set_trace()
 	a = 1
+'''

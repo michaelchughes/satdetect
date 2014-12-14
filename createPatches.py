@@ -3,7 +3,7 @@ from satdetect.featextract import WindowExtractor
 
 '''
 	Sample run:
-	python createLabelImage.py --imgpath ~/documents/projects/tukuldata/datasets/Sudan-MakerAwat-20101219/sudanma-scene1.jpg  --outpath ~/documents/projects/extracted_patches/ --configpath ~/documents/projects/tukuldata/datasets/labels.cfg
+	python createPatches.py --imgpath ~/documents/projects/tukuldata/datasets/Sudan-MakerAwat-20101219/sudanma-scene1.jpg  --outpath ~/documents/projects/extracted_patches/ --configpath ~/documents/projects/tukuldata/datasets/labels.cfg
 '''
 
 if __name__ == "__main__":
@@ -14,4 +14,4 @@ if __name__ == "__main__":
 
   (options, args) = parser.parse_args()
   
-  WindowExtractor.createLabelImage(options.imgpath, options.configpath, options.outpath)
+  WindowExtractor.extractPatches(options.imgpath, options.configpath, options.outpath)
